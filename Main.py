@@ -5,18 +5,14 @@ from Music import Sequence, MessageType, Element
 
 
 def main():
-    # midiFile = MidiFile("res/bach_op27_r.mid")
-    midiFile = MidiFile("res/bach_op27_r.mid")
-
-    bach = Sequence.fromMidiFile(midiFile)
-    created = bach.toMidiFile()
-
-    created.save("res/created.mid")
-
+    print("Lel")
 
 def test():
-    musical = mu.Musical.fromMidiFiles(MidiFile("res/beethoven_op27_r.mid"), MidiFile("res/beethoven_op27_l.mid"))
-    musical.guessScale()
+    musical = mu.Musical.from_midi_file(MidiFile("res/beethoven_op27_r.mid"), MidiFile("res/beethoven_op27_l.mid"))
+    print(musical.detect_scale())
+    musical.transpose(-4)
+    musical.to_midi_file().save("out/beethoven_op27n.mid")
+    print(musical.detect_scale())
 
 
 if __name__ == '__main__':

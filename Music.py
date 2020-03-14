@@ -3,7 +3,7 @@ from enum import Enum
 import numpy as np
 
 
-def printMidiFile(midifile: MidiFile, amount=-1):
+def print_midi_file(midifile: MidiFile, amount=-1):
     print("Start Midi File")
     print("Ticks per beat: " + midifile.ticks_per_beat.__str__() + ", Type: " + midifile.type.__str__())
     for j, track in enumerate(midifile.tracks):
@@ -13,7 +13,7 @@ def printMidiFile(midifile: MidiFile, amount=-1):
     print("End Midi File")
 
 
-def printMetaMidiFile(midifile: MidiFile):
+def print_meta_midi_file(midifile: MidiFile):
     print("Ticks per beat: " + midifile.ticks_per_beat.__str__() + ", Type: " + midifile.type.__str__())
 
 
@@ -39,7 +39,7 @@ class Note(Enum):
     f_b = e
 
     @staticmethod
-    def fromNoteValue(note_value: int):
+    def from_note_value(note_value: int):
         switcher = {
             0: Note.c,
             1: Note.c_s,
@@ -94,7 +94,7 @@ class Sequence:
         self.denominator = denominator
 
     @staticmethod
-    def fromMidiFile(midifile: MidiFile):
+    def from_midi_file(midifile: MidiFile):
         sequence = Sequence()
         numerator = 4
         denominator = 4
@@ -128,11 +128,11 @@ class Sequence:
                 elif message.type == "control_change":
                     continue
                 else:
-                    print(message.type)
+                    print("Unknown message: " + message.type)
 
         return sequence
 
-    def toMidiTrack(self):
+    def to_midi_track(self):
         track = MidiTrack()
 
         track.append(
@@ -160,6 +160,31 @@ class Sequence:
 
         return track
 
+    def detect_scale(self):
+        mismatch = dict()
+
+        for scale in Scale:
+            mismatch[scale] = 0
+
+        for element in self.elements:
+            if element.message_type != MessageType.play: continue
+            note_value = element.value % 12
+            note = Note.from_note_value(note_value)
+            for scale in Scale:
+                if note not in scale.value:
+                    mismatch[scale] += 1
+
+        return sorted(mismatch.items(), key=lambda item: item[1])[0][0]
+
+    def transpose(self, steps: int):
+        for i, element in enumerate(self.elements):
+            if element.message_type != MessageType.play and element.message_type != MessageType.stop: continue
+            self.elements.pop(i)
+            element.value += steps
+            while element.value < 21: element.value += 12
+            while element.value > 108: element.value -= 12
+            self.elements.insert(i, element)
+
 
 class Musical:
 
@@ -170,15 +195,15 @@ class Musical:
         self.denominator = denominator
 
     @staticmethod
-    def fromMidiFiles(right_hand: MidiFile, left_hand: MidiFile):
-        seqr = Sequence.fromMidiFile(right_hand)
-        seql = Sequence.fromMidiFile(left_hand)
+    def from_midi_file(right_hand: MidiFile, left_hand: MidiFile):
+        seqr = Sequence.from_midi_file(right_hand)
+        seql = Sequence.from_midi_file(left_hand)
         numerator = np.lcm(seqr.numerator, seql.numerator)
         denominator = np.lcm(seqr.denominator, seql.denominator)
         musical = Musical(seqr, seql, numerator, denominator)
         return musical
 
-    def toMidiFile(self):
+    def to_midi_file(self):
         midi_file = MidiFile()
         tpb = 96
         midi_file.ticks_per_beat = tpb
@@ -205,39 +230,20 @@ class Musical:
             self.left_hand.elements.pop(0)
             self.right_hand.elements.append(Element(MessageType.wait, wait_left, wait_left_velocity))
 
-        right_track = self.right_hand.toMidiTrack()
+        right_track = self.right_hand.to_midi_track()
         right_track.insert(0, MetaMessage("track_name", name="Right Hand\x00", time=0))
-        left_track = self.left_hand.toMidiTrack()
+        left_track = self.left_hand.to_midi_track()
         left_track.insert(0, MetaMessage("track_name", name="Left Hand\x00", time=0))
         midi_file.tracks.append(right_track)
         midi_file.tracks.append(left_track)
         return midi_file
 
-    def guessScale(self):
-        right_mismatch = dict()
-        left_mismatch = dict()
+    def detect_scale(self):
+        return self.right_hand.detect_scale(), self.left_hand.detect_scale()
 
-        for scale in Scale:
-            right_mismatch[scale] = 0
-            left_mismatch[scale] = 0
-
-        for element in self.right_hand.elements:
-            if element.message_type != MessageType.play: continue
-            note_value = element.value % 12
-            note = Note.fromNoteValue(note_value)
-            for scale in Scale:
-                if note not in scale.value:
-                    right_mismatch[scale] += 1
-
-        for element in self.left_hand.elements:
-            if element.message_type != MessageType.play: continue
-            note_value = element.value % 12
-            note = Note.fromNoteValue(note_value)
-            for scale in Scale:
-                if note not in scale.value:
-                    left_mismatch[scale] += 1
-
-        return right_mismatch[0], left_mismatch[0]
+    def transpose(self, steps: int):
+        self.right_hand.transpose(steps)
+        self.left_hand.transpose(steps)
 
 
 class Element:

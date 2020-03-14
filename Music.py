@@ -1,5 +1,6 @@
 from mido import MidiFile, MetaMessage, MidiTrack, Message
 from enum import Enum
+import numpy as np
 
 
 def printMidiFile(midifile: MidiFile, amount=-1):
@@ -37,6 +38,24 @@ class Note(Enum):
     c_b = b
     f_b = e
 
+    @staticmethod
+    def fromNoteValue(note_value: int):
+        switcher = {
+            0: Note.c,
+            1: Note.c_s,
+            2: Note.d,
+            3: Note.d_s,
+            4: Note.e,
+            5: Note.f,
+            6: Note.f_s,
+            7: Note.g,
+            8: Note.g_s,
+            9: Note.a,
+            10: Note.a_s,
+            11: Note.b
+        }
+        return switcher.get(note_value, -1)
+
 
 class Scale(Enum):
     cmaj_amin = {Note.c, Note.d, Note.e, Note.f, Note.g, Note.a, Note.b}
@@ -69,12 +88,16 @@ class MessageType(Enum):
 
 class Sequence:
 
-    def __init__(self):
+    def __init__(self, numerator=4, denominator=4):
         self.elements = []
+        self.numerator = numerator
+        self.denominator = denominator
 
     @staticmethod
     def fromMidiFile(midifile: MidiFile):
         sequence = Sequence()
+        numerator = 4
+        denominator = 4
 
         # Parse midi
         for i, track in enumerate(midifile.tracks):
@@ -83,7 +106,13 @@ class Sequence:
             wait_buffer = 0
 
             for message in track:
-                if isinstance(message, MetaMessage): continue
+                if isinstance(message, MetaMessage):
+                    if message.type == "time_signature":
+                        numerator = message.numerator
+                        denominator = message.denominator
+                        continue
+                    else:
+                        continue
 
                 if message.type == "note_on" or message.type == "note_off" or message.type == "control_change":
                     wait_buffer += message.time
@@ -101,18 +130,14 @@ class Sequence:
                 else:
                     print(message.type)
 
-        print(sequence.elements)
-        print("Size: " + len(sequence.elements).__str__())
-
         return sequence
 
     def toMidiTrack(self):
         track = MidiTrack()
 
-        track.append(MetaMessage("time_signature", numerator=4, denominator=4, clocks_per_click=36,
-                                 notated_32nd_notes_per_beat=8, time=0))
-        track.append(MetaMessage("time_signature", numerator=4, denominator=4, clocks_per_click=36,
-                                 notated_32nd_notes_per_beat=8, time=0))
+        track.append(
+            MetaMessage("time_signature", numerator=self.numerator, denominator=self.denominator, clocks_per_click=36,
+                        notated_32nd_notes_per_beat=8, time=0))
 
         wait_buffer = 0
         active_notes = set()
@@ -138,13 +163,19 @@ class Sequence:
 
 class Musical:
 
-    def __init__(self, right_hand: Sequence, left_hand: Sequence):
+    def __init__(self, right_hand: Sequence, left_hand: Sequence, numerator=4, denominator=4):
         self.right_hand = right_hand
         self.left_hand = left_hand
+        self.numerator = numerator
+        self.denominator = denominator
 
     @staticmethod
     def fromMidiFiles(right_hand: MidiFile, left_hand: MidiFile):
-        musical = Musical(Sequence.fromMidiFile(right_hand), Sequence.fromMidiFile(left_hand))
+        seqr = Sequence.fromMidiFile(right_hand)
+        seql = Sequence.fromMidiFile(left_hand)
+        numerator = np.lcm(seqr.numerator, seql.numerator)
+        denominator = np.lcm(seqr.denominator, seql.denominator)
+        musical = Musical(seqr, seql, numerator, denominator)
         return musical
 
     def toMidiFile(self):
@@ -181,6 +212,32 @@ class Musical:
         midi_file.tracks.append(right_track)
         midi_file.tracks.append(left_track)
         return midi_file
+
+    def guessScale(self):
+        right_mismatch = dict()
+        left_mismatch = dict()
+
+        for scale in Scale:
+            right_mismatch[scale] = 0
+            left_mismatch[scale] = 0
+
+        for element in self.right_hand.elements:
+            if element.message_type != MessageType.play: continue
+            note_value = element.value % 12
+            note = Note.fromNoteValue(note_value)
+            for scale in Scale:
+                if note not in scale.value:
+                    right_mismatch[scale] += 1
+
+        for element in self.left_hand.elements:
+            if element.message_type != MessageType.play: continue
+            note_value = element.value % 12
+            note = Note.fromNoteValue(note_value)
+            for scale in Scale:
+                if note not in scale.value:
+                    left_mismatch[scale] += 1
+
+        return right_mismatch[0], left_mismatch[0]
 
 
 class Element:

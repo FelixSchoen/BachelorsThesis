@@ -16,7 +16,7 @@ def main():
 
 def test():
     musical = mu.Musical.fromMidiFiles(MidiFile("res/beethoven_op27_r.mid"), MidiFile("res/beethoven_op27_l.mid"))
-    musical.toMidiFile().save("out/beethoven_op27.mid")
+    musical.guessScale()
 
 
 if __name__ == '__main__':

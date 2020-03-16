@@ -3,18 +3,19 @@ from enum import Enum
 import numpy as np
 
 
-def print_midi_file(midifile: MidiFile, amount=-1):
+def print_midi_file(midi_file: MidiFile, amount=-1) -> None:
     print("Start Midi File")
-    print("Ticks per beat: " + midifile.ticks_per_beat.__str__() + ", Type: " + midifile.type.__str__())
-    for j, track in enumerate(midifile.tracks):
+    print("Ticks per beat: " + str(midi_file.ticks_per_beat) + ", Type: " + str(midi_file.type))
+    for j, track in enumerate(midi_file.tracks):
         for i, message in enumerate(track):
-            if i >= amount != -1: break
+            if i >= amount != -1:
+                break
             print(message)
     print("End Midi File")
 
 
-def print_meta_midi_file(midifile: MidiFile):
-    print("Ticks per beat: " + midifile.ticks_per_beat.__str__() + ", Type: " + midifile.type.__str__())
+def print_meta_midi_file(midi_file: MidiFile) -> None:
+    print("Ticks per beat: " + str(midi_file.ticks_per_beat) + ", Type: " + str(midi_file.type))
 
 
 class Note(Enum):
@@ -94,14 +95,15 @@ class Sequence:
         self.denominator = denominator
 
     @staticmethod
-    def from_midi_file(midifile: MidiFile):
+    def from_midi_file(midi_file: MidiFile):
         sequence = Sequence()
         numerator = 4
         denominator = 4
 
         # Parse midi
-        for i, track in enumerate(midifile.tracks):
-            if i != 0: break
+        for i, track in enumerate(midi_file.tracks):
+            if i != 0:
+                break
 
             wait_buffer = 0
 
@@ -130,9 +132,11 @@ class Sequence:
                 else:
                     print("Unknown message: " + message.type)
 
+        sequence.numerator = numerator
+        sequence.denominator = denominator
         return sequence
 
-    def to_midi_track(self):
+    def to_midi_track(self) -> MidiTrack:
         track = MidiTrack()
 
         track.append(
@@ -146,12 +150,14 @@ class Sequence:
             if element.message_type == MessageType.wait:
                 wait_buffer += element.value
             elif element.message_type == MessageType.play:
-                if element.value in active_notes: continue
+                if element.value in active_notes:
+                    continue
                 track.append(Message("note_on", note=element.value, velocity=element.velocity, time=wait_buffer))
                 active_notes.add(element.value)
                 wait_buffer = 0
             elif element.message_type == MessageType.stop:
-                if not element.value in active_notes: continue
+                if element.value not in active_notes:
+                    continue
                 track.append(Message("note_off", note=element.value, velocity=element.velocity, time=wait_buffer))
                 active_notes.remove(element.value)
                 wait_buffer = 0
@@ -160,14 +166,23 @@ class Sequence:
 
         return track
 
-    def detect_scale(self):
+    def to_midi_file(self) -> MidiFile:
+        midi_file = MidiFile()
+        tpb = Musical.ticks_per_beat
+        midi_file.ticks_per_beat = tpb
+        midi_file.type = 1
+        midi_file.tracks.append(self.to_midi_track())
+        return midi_file
+
+    def detect_scale(self) -> list:
         mismatch = dict()
 
         for scale in Scale:
             mismatch[scale] = 0
 
         for element in self.elements:
-            if element.message_type != MessageType.play: continue
+            if element.message_type != MessageType.play:
+                continue
             note_value = element.value % 12
             note = Note.from_note_value(note_value)
             for scale in Scale:
@@ -178,15 +193,95 @@ class Sequence:
 
     def transpose(self, steps: int):
         for i, element in enumerate(self.elements):
-            if element.message_type != MessageType.play and element.message_type != MessageType.stop: continue
+            if element.message_type != MessageType.play and element.message_type != MessageType.stop:
+                continue
             self.elements.pop(i)
             element.value += steps
-            while element.value < 21: element.value += 12
-            while element.value > 108: element.value -= 12
+            while element.value < 21:
+                element.value += 12
+            while element.value > 108:
+                element.value -= 12
             self.elements.insert(i, element)
+
+    def split(self, numerator: int, denominator: int) -> list:
+        max_duration = Musical.ticks_per_beat * (numerator / denominator)
+
+        # Sequence to append
+        seq = Sequence(numerator, denominator)
+        # Generated Sequences
+        seq_list = list()
+        # Initial queue, instructions of the original sequence are in here
+        initial_queue = self.elements.copy()
+        # Carry queue, elements that need to be carried to the next bar contained in here
+        carry_queue = list()
+
+        # Duration of all elements in current iteration
+        duration = 0
+        # Values of notes that are open, used to close these at the end of an iteration
+        open_notes = set()
+        # Determines if current bar is done
+        flag_end = False
+        # Determines if carry queue should be used
+        flag_carry = False
+
+        print("Debug Initial: " + str(initial_queue))
+
+        while len(initial_queue) != 0 or len(carry_queue) != 0:
+            if len(carry_queue) != 0 and flag_carry:
+                element = carry_queue.pop(0)
+            else:
+                flag_carry = False
+                element = initial_queue.pop(0)
+
+            if element.message_type == MessageType.play:
+                if duration < max_duration:
+                    # Can play note in this bar
+                    open_notes.add(WrappedElement(element))
+                    seq.elements.append(element)
+                else:
+                    # Need to carry note to next bar
+                    carry_queue.append(element)
+            elif element.message_type == MessageType.stop:
+                open_notes.remove(WrappedElement(element))
+                seq.elements.append(element)
+            elif element.message_type == MessageType.wait:
+                if duration + element.value <= max_duration:
+                    # Wait message fits in its entirety
+                    duration += element.value
+                    seq.elements.append(element)
+                else:
+                    # Wait does not fit
+                    fit_duration = max_duration - duration
+                    remainder_duration = element.value - fit_duration
+                    duration += fit_duration
+                    if fit_duration > 0:
+                        seq.elements.append(Element(MessageType.wait, int(fit_duration), element.velocity))
+                    carry_queue.append(Element(MessageType.wait, int(remainder_duration), element.velocity))
+                    flag_end = True
+
+            # Process ending of bar, add to list, close open notes
+            if flag_end:
+                flag_carry = True
+                for open_note in open_notes:
+                    carry_queue.insert(0, open_note.element)
+                    seq.elements.append(Element(MessageType.stop, open_note.element.value, Musical.std_velocity))
+                seq_list.append(seq)
+                seq = Sequence(numerator, denominator)
+                duration = 0
+                flag_end = False
+
+        # Manually append last sequence, because it never triggers end detection
+        seq_list.append(seq)
+        return seq_list
+
+    def __str__(self) -> str:
+        return "(Numerator: " + str(self.numerator) + ", Denominator: " + str(
+            self.denominator) + ", Elements: " + str(self.elements) + ")"
 
 
 class Musical:
+    std_velocity = 64
+    ticks_per_beat = 96
 
     def __init__(self, right_hand: Sequence, left_hand: Sequence, numerator=4, denominator=4):
         self.right_hand = right_hand
@@ -205,7 +300,7 @@ class Musical:
 
     def to_midi_file(self):
         midi_file = MidiFile()
-        tpb = 96
+        tpb = Musical.ticks_per_beat
         midi_file.ticks_per_beat = tpb
         midi_file.type = 1
 
@@ -255,7 +350,23 @@ class Element:
         self.velocity = velocity
 
     def __str__(self) -> str:
-        return "(" + self.message_type.__str__() + self.value.__str__() + ")"
+        return "(" + str(self.message_type) + str(self.value) + ")"
 
     def __repr__(self) -> str:
         return self.__str__()
+
+
+class WrappedElement:
+    """
+    A wrapper for the Element class, implementing a custom comparator,
+    only comparing the value of the contained element.
+    """
+
+    def __init__(self, element: Element):
+        self.element = element
+
+    def __eq__(self, other):
+        return self.element.value == other.element.value
+
+    def __hash__(self):
+        return hash(self.element.value)

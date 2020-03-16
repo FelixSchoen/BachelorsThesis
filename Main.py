@@ -8,11 +8,11 @@ def main():
     print("Lel")
 
 def test():
-    musical = mu.Musical.from_midi_file(MidiFile("res/beethoven_op27_r.mid"), MidiFile("res/beethoven_op27_l.mid"))
-    print(musical.detect_scale())
-    musical.transpose(-4)
-    musical.to_midi_file().save("out/beethoven_op27n.mid")
-    print(musical.detect_scale())
+    seq = mu.Sequence.from_midi_file(MidiFile("res/stop_track.mid"))
+    for i, sequence in enumerate(seq.split(seq.numerator, seq.denominator)):
+        if i > 4: break
+        print(sequence)
+        sequence.to_midi_file().save("out/"+str(i)+".mid")
 
 
 if __name__ == '__main__':

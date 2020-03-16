@@ -1,6 +1,7 @@
 from mido import MidiFile, MetaMessage, MidiTrack, Message
 from enum import Enum
 import numpy as np
+import Music as mu
 
 
 def print_midi_file(midi_file: MidiFile, amount=-1) -> None:
@@ -136,6 +137,19 @@ class Sequence:
         sequence.denominator = denominator
         return sequence
 
+    @staticmethod
+    def stitch_together(sequences: list):
+        sequence = Sequence()
+        numerator = sequences[0].numerator
+        denominator = sequences[0].denominator
+
+        for seq in sequences:
+            sequence.elements.extend(seq.elements)
+
+        sequence.numerator = numerator
+        sequence.denominator = denominator
+        return sequence
+
     def to_midi_track(self) -> MidiTrack:
         track = MidiTrack()
 
@@ -174,7 +188,7 @@ class Sequence:
         midi_file.tracks.append(self.to_midi_track())
         return midi_file
 
-    def detect_scale(self) -> list:
+    def detect_scale(self) -> (list, float):
         mismatch = dict()
 
         for scale in Scale:
@@ -189,7 +203,10 @@ class Sequence:
                 if note not in scale.value:
                     mismatch[scale] += 1
 
-        return sorted(mismatch.items(), key=lambda item: item[1])[0][0]
+        guess = sorted(mismatch.items(), key=lambda item: item[1])
+        percentage = list(map(lambda x: 1 - x[1] / len(self.elements), guess))
+
+        return sorted(mismatch.items(), key=lambda item: item[1])[0][0], percentage[0]
 
     def transpose(self, steps: int):
         for i, element in enumerate(self.elements):
@@ -204,7 +221,7 @@ class Sequence:
             self.elements.insert(i, element)
 
     def split(self, numerator: int, denominator: int) -> list:
-        max_duration = Musical.ticks_per_beat * (numerator / denominator)
+        max_duration = 4 * Musical.ticks_per_beat * (numerator / denominator)
 
         # Sequence to append
         seq = Sequence(numerator, denominator)
@@ -223,8 +240,6 @@ class Sequence:
         flag_end = False
         # Determines if carry queue should be used
         flag_carry = False
-
-        print("Debug Initial: " + str(initial_queue))
 
         while len(initial_queue) != 0 or len(carry_queue) != 0:
             if len(carry_queue) != 0 and flag_carry:
@@ -262,9 +277,10 @@ class Sequence:
             # Process ending of bar, add to list, close open notes
             if flag_end:
                 flag_carry = True
-                for open_note in open_notes:
+                for open_note in open_notes.copy():
                     carry_queue.insert(0, open_note.element)
                     seq.elements.append(Element(MessageType.stop, open_note.element.value, Musical.std_velocity))
+                    open_notes.remove(open_note)
                 seq_list.append(seq)
                 seq = Sequence(numerator, denominator)
                 duration = 0
@@ -295,6 +311,29 @@ class Musical:
         seql = Sequence.from_midi_file(left_hand)
         numerator = np.lcm(seqr.numerator, seql.numerator)
         denominator = np.lcm(seqr.denominator, seql.denominator)
+
+        # Check if there are empty bars at the beginning
+        wait_right = 0
+        wait_right_velocity = Musical.std_velocity
+        tpb = Musical.ticks_per_beat
+        if seqr.elements[0].message_type == MessageType.wait:
+            wait_right = seqr.elements[0].value
+            wait_right_velocity = seqr.elements[0].velocity
+        wait_left = 0
+        wait_left_velocity = 64
+        if seql.elements[0].message_type == MessageType.wait:
+            wait_left = seql.elements[0].value
+            wait_left_velocity = seql.elements[0].velocity
+
+        if wait_right > 0 and wait_left > 0:
+            while wait_right - 4 * tpb >= 0 and wait_left - 4 * tpb >= 0:
+                wait_right -= 4 * tpb
+                wait_left -= 4 * tpb
+            seqr.elements.pop(0)
+            seqr.elements.append(Element(MessageType.wait, wait_right, wait_right_velocity))
+            seql.elements.pop(0)
+            seql.elements.append(Element(MessageType.wait, wait_left, wait_left_velocity))
+
         musical = Musical(seqr, seql, numerator, denominator)
         return musical
 
@@ -303,27 +342,6 @@ class Musical:
         tpb = Musical.ticks_per_beat
         midi_file.ticks_per_beat = tpb
         midi_file.type = 1
-
-        # Check if there are empty bars at the beginning
-        wait_right = 0
-        wait_right_velocity = 64
-        if self.right_hand.elements[0].message_type == MessageType.wait:
-            wait_right = self.right_hand.elements[0].value
-            wait_right_velocity = self.right_hand.elements[0].velocity
-        wait_left = 0
-        wait_left_velocity = 64
-        if self.left_hand.elements[0].message_type == MessageType.wait:
-            wait_left = self.left_hand.elements[0].value
-            wait_left_velocity = self.left_hand.elements[0].velocity
-
-        if wait_right > 0 and wait_left > 0:
-            while wait_right - 4 * tpb >= 0 and wait_left - 4 * tpb >= 0:
-                wait_right -= 4 * tpb
-                wait_left -= 4 * tpb
-            self.right_hand.elements.pop(0)
-            self.right_hand.elements.append(Element(MessageType.wait, wait_right, wait_right_velocity))
-            self.left_hand.elements.pop(0)
-            self.right_hand.elements.append(Element(MessageType.wait, wait_left, wait_left_velocity))
 
         right_track = self.right_hand.to_midi_track()
         right_track.insert(0, MetaMessage("track_name", name="Right Hand\x00", time=0))

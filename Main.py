@@ -15,14 +15,13 @@ def main():
 
 def test():
     seq = Sequence.from_midi_file(MidiFile("res/4-4/beethoven_op27_csmin_mo3_0.mid"))
+    seq.to_midi_file().save("out/half.mid")
     hash = set()
     for element in seq.elements:
-        if not element.message_type == MessageType.wait:
-            continue
-        hash.add(element)
-    print(hash)
-
+        if element.message_type == MessageType.wait:
+            hash.add(element.value)
+    print(sorted(hash))
 
 
 if __name__ == '__main__':
-    test()
+    print("Test")

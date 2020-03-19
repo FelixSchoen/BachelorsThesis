@@ -107,7 +107,7 @@ class Sequence:
         self.denominator = denominator
 
     @staticmethod
-    def from_midi_file(midi_file: MidiFile):
+    def from_midi_file(midi_file: MidiFile, modifier: float = 1):
         sequence = Sequence()
         numerator = 4
         denominator = 4
@@ -132,7 +132,8 @@ class Sequence:
                     wait_buffer += message.time
                     if wait_buffer != 0 and message.type != "control_change":
                         # Generate Wait Message
-                        sequence.elements.append(Element(MessageType.wait, wait_buffer, message.velocity))
+                        sequence.elements.append(
+                            Element(MessageType.wait, int(wait_buffer * modifier), message.velocity))
                         wait_buffer = 0
 
                 if message.type == "note_on":
@@ -412,6 +413,36 @@ class Sequence:
                 last_notes.append(Note.from_note_value(element.value % 12))
 
         return last_notes
+
+    @staticmethod
+    def quantize(wait: int):
+        tpb = Musical.ticks_per_beat
+        unit_normal = tpb
+        unit_triplet = unit_normal * 2 / 3
+        step_normal = -1
+        step_triplet = 0
+
+        wait_quantized = 0
+        while wait_quantized < wait:
+            step_normal = (step_normal + 1) % 2
+            step_triplet = (step_triplet + 1) % 3
+            wait_quantized += unit_normal
+
+        wait_quantized -= unit_normal
+        distance = (step_triplet * unit_triplet) - (step_normal * unit_normal)
+        remainder = unit_normal - distance
+
+        if wait < wait_quantized + distance:
+            if wait <= wait_quantized + distance / 2:
+                return wait_quantized
+            else:
+                return wait_quantized + distance
+        else:
+            if wait < wait_quantized + distance + remainder / 2:
+                return wait_quantized + distance
+            else:
+                return wait_quantized + unit_normal
+
 
     @staticmethod
     def util_adjust_rating(value: float):

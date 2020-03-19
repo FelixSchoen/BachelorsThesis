@@ -23,5 +23,9 @@ def test():
     print(sorted(hash))
 
 
+def asdf():
+    seq = mu.Sequence.from_midi_file(MidiFile("res/4-4/beethoven_op27_csmin_mo3_0.mid"))
+    mu.Sequence.stitch_together(seq.split()).to_midi_file().save("out/generated.mid")
+
 if __name__ == '__main__':
-    print("Test")
+    asdf()

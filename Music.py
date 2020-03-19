@@ -108,6 +108,7 @@ class Sequence:
 
     @staticmethod
     def from_midi_file(midi_file: MidiFile, modifier: float = 1):
+        tpb = Musical.ticks_per_beat
         sequence = Sequence()
         numerator = 4
         denominator = 4
@@ -132,6 +133,10 @@ class Sequence:
                     wait_buffer += message.time
                     if wait_buffer != 0 and message.type != "control_change":
                         # Generate Wait Message
+                        while wait_buffer > tpb:
+                            wait_buffer -= tpb
+                            sequence.elements.append(
+                                Element(MessageType.wait, int(tpb * modifier), message.velocity))
                         sequence.elements.append(
                             Element(MessageType.wait, int(wait_buffer * modifier), message.velocity))
                         wait_buffer = 0
@@ -154,9 +159,16 @@ class Sequence:
         sequence = Sequence()
         numerator = sequences[0].numerator
         denominator = sequences[0].denominator
+        tpb = Musical.ticks_per_beat
 
         for seq in sequences:
-            sequence.elements.extend(seq.elements)
+            time = numerator / denominator * tpb * 4
+            for element in seq.elements:
+                if element.message_type == MessageType.wait:
+                    time -= element.value
+                sequence.elements.append(element)
+            if time > 0 and not seq == sequences[-1]:
+                sequence.elements.append(Element(MessageType.wait, time, Musical.std_velocity))
 
         sequence.numerator = numerator
         sequence.denominator = denominator
@@ -246,7 +258,11 @@ class Sequence:
                 element.value -= 12
             self.elements.insert(i, element)
 
-    def split(self, numerator: int, denominator: int) -> list:
+    def split(self, numerator: int = -1, denominator: int = -1) -> list:
+        if numerator == -1:
+            numerator = self.numerator
+        if denominator == -1:
+            denominator = self.denominator
         max_duration = 4 * Musical.ticks_per_beat * (numerator / denominator)
 
         # Sequence to append
@@ -415,7 +431,7 @@ class Sequence:
         return last_notes
 
     @staticmethod
-    def quantize(wait: int):
+    def quantize_note(wait: int):
         tpb = Musical.ticks_per_beat
         unit_normal = tpb
         unit_triplet = unit_normal * 2 / 3
@@ -442,7 +458,6 @@ class Sequence:
                 return wait_quantized + distance
             else:
                 return wait_quantized + unit_normal
-
 
     @staticmethod
     def util_adjust_rating(value: float):

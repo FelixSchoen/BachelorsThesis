@@ -239,7 +239,7 @@ class Sequence:
             else:
                 elements.update({element: wait})
 
-        absolute.elements = elements
+        absolute.elements = sorted(elements.items(), key=lambda item: item[1])
         return absolute
 
     def detect_ideal_scale(self) -> (list, list):
@@ -447,7 +447,7 @@ class Sequence:
         return last_notes
 
     @staticmethod
-    def quantize_note(wait: int):
+    def quantize_value(wait: int):
         tpb = Musical.internal_ticks
         unit_normal = tpb / 8
         unit_triplet = unit_normal * 2 / 3
@@ -483,6 +483,26 @@ class SequenceAbsolute(Sequence):
 
     def __init__(self, numerator=4, denominator=4):
         super().__init__(numerator, denominator)
+
+    def to_relative_sequence(self) -> Sequence:
+        relative = Sequence(self.numerator, self.denominator)
+        wait = 0
+
+        for element in sorted(self.elements, key=lambda item: item[1]):
+            if element[1] > wait:
+                relative.elements.append(Element(MessageType.wait, element[1]-wait, Musical.std_velocity))
+                wait = element[1]
+            relative.elements.append(element[0])
+
+        return relative
+
+    def quantize(self):
+        for element in self.elements:
+            if element[0].message_type == MessageType.wait:
+                index = self.elements.index(element)
+                self.elements.pop(index)
+                quantized_element = Element(element.message_type, mu.Sequence.quantize_value(element.value), element.velocity)
+                self.elements.insert(index, quantized_element)
 
 
 class Musical:

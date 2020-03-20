@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from mido import MidiFile, MetaMessage, MidiTrack, Message
 from enum import Enum
 import numpy as np
@@ -77,13 +79,6 @@ class Scale(Enum):
     dbmaj_bbmin = [Note.d_b, Note.e_b, Note.f, Note.g_b, Note.a_b, Note.b_b, Note.c]
     fsmaj_dsmin = [Note.f_s, Note.g_s, Note.a_s, Note.b, Note.c_s, Note.d_s, Note.f]  # Special
 
-    @staticmethod
-    def from_tonic(note: Note):
-        switcher = {
-            Note.c: Scale.cmaj_amin
-        }
-        # TODO
-
 
 class MessageType(Enum):
     play = 0
@@ -107,8 +102,8 @@ class Sequence:
         self.denominator = denominator
 
     @staticmethod
-    def from_midi_file(midi_file: MidiFile, modifier: float = 1):
-        tpb = Musical.ticks_per_beat
+    def from_midi_file(midi_file: MidiFile, modifier: float = 0.25):
+        ticks = Musical.internal_ticks
         sequence = Sequence()
         numerator = 4
         denominator = 4
@@ -130,15 +125,16 @@ class Sequence:
                         continue
 
                 if message.type == "note_on" or message.type == "note_off" or message.type == "control_change":
-                    wait_buffer += message.time
+                    wait_buffer += message.time * modifier
                     if wait_buffer != 0 and message.type != "control_change":
+                        # wait_buffer = Sequence.quantize_note(wait_buffer)
                         # Generate Wait Message
-                        while wait_buffer > tpb:
-                            wait_buffer -= tpb
-                            sequence.elements.append(
-                                Element(MessageType.wait, int(tpb * modifier), message.velocity))
+                        # while wait_buffer > ticks:
+                        #     wait_buffer -= ticks
+                        #     sequence.elements.append(
+                        #         Element(MessageType.wait, ticks, message.velocity))
                         sequence.elements.append(
-                            Element(MessageType.wait, int(wait_buffer * modifier), message.velocity))
+                            Element(MessageType.wait, wait_buffer, message.velocity))
                         wait_buffer = 0
 
                 if message.type == "note_on":
@@ -159,10 +155,10 @@ class Sequence:
         sequence = Sequence()
         numerator = sequences[0].numerator
         denominator = sequences[0].denominator
-        tpb = Musical.ticks_per_beat
+        ticks = Musical.internal_ticks
 
         for seq in sequences:
-            time = numerator / denominator * tpb * 4
+            time = numerator / denominator * ticks * 4
             for element in seq.elements:
                 if element.message_type == MessageType.wait:
                     time -= element.value
@@ -190,7 +186,7 @@ class Sequence:
                 "Concurrent Notes": sum([pair[1]["Concurrent Notes"] for pair in complexity]) / occurrences}
         return avg_complexity, dict
 
-    def to_midi_track(self) -> MidiTrack:
+    def to_midi_track(self, modifier: float = 4) -> MidiTrack:
         track = MidiTrack()
 
         track.append(
@@ -206,13 +202,17 @@ class Sequence:
             elif element.message_type == MessageType.play:
                 if element.value in active_notes:
                     continue
-                track.append(Message("note_on", note=element.value, velocity=element.velocity, time=wait_buffer))
+                track.append(
+                    Message("note_on", note=element.value, velocity=element.velocity, time=int(wait_buffer * modifier)))
                 active_notes.add(element.value)
                 wait_buffer = 0
             elif element.message_type == MessageType.stop:
+                # TODO überflüssiger check?
                 if element.value not in active_notes:
                     continue
-                track.append(Message("note_off", note=element.value, velocity=element.velocity, time=wait_buffer))
+                track.append(
+                    Message("note_off", note=element.value, velocity=element.velocity,
+                            time=int(wait_buffer * modifier)))
                 active_notes.remove(element.value)
                 wait_buffer = 0
 
@@ -227,6 +227,20 @@ class Sequence:
         midi_file.type = 1
         midi_file.tracks.append(self.to_midi_track())
         return midi_file
+
+    def to_absolute_sequence(self) -> SequenceAbsolute:
+        elements = {}
+        absolute = SequenceAbsolute(self.numerator, self.denominator)
+        wait = 0
+
+        for element in self.elements:
+            if element.message_type == MessageType.wait:
+                wait += element.value
+            else:
+                elements.update({element: wait})
+
+        absolute.elements = elements
+        return absolute
 
     def detect_ideal_scale(self) -> (list, list):
         mismatch = dict()
@@ -263,9 +277,9 @@ class Sequence:
             numerator = self.numerator
         if denominator == -1:
             denominator = self.denominator
-        max_duration = 4 * Musical.ticks_per_beat * (numerator / denominator)
+        max_duration = 4 * Musical.internal_ticks * (numerator / denominator)
 
-        # Sequence to append
+        # Sequence in iteration to append
         seq = Sequence(numerator, denominator)
         # Generated Sequences
         seq_list = list()
@@ -323,6 +337,8 @@ class Sequence:
                     carry_queue.insert(0, open_note.element)
                     seq.elements.append(Element(MessageType.stop, open_note.element.value, Musical.std_velocity))
                     open_notes.remove(open_note)
+                if seq.elements[-1].message_type == MessageType.wait:
+                    seq.elements.pop(-1)
                 seq_list.append(seq)
                 seq = Sequence(numerator, denominator)
                 duration = 0
@@ -432,29 +448,24 @@ class Sequence:
 
     @staticmethod
     def quantize_note(wait: int):
-        tpb = Musical.ticks_per_beat
-        unit_normal = tpb
+        tpb = Musical.internal_ticks
+        unit_normal = tpb / 8
         unit_triplet = unit_normal * 2 / 3
-        step_normal = -1
-        step_triplet = 0
 
-        wait_quantized = 0
-        while wait_quantized < wait:
-            step_normal = (step_normal + 1) % 2
-            step_triplet = (step_triplet + 1) % 3
-            wait_quantized += unit_normal
+        step_normal = (wait // unit_normal) % 2
+        step_triplet = (wait // unit_triplet) % 3
+        wait_quantized = unit_normal * (wait // unit_normal)
 
-        wait_quantized -= unit_normal
         distance = (step_triplet * unit_triplet) - (step_normal * unit_normal)
         remainder = unit_normal - distance
 
-        if wait < wait_quantized + distance:
-            if wait <= wait_quantized + distance / 2:
+        if wait_quantized + distance > wait:
+            if wait_quantized + distance / 2 >= wait:
                 return wait_quantized
             else:
                 return wait_quantized + distance
         else:
-            if wait < wait_quantized + distance + remainder / 2:
+            if wait_quantized + distance + remainder / 2 > wait:
                 return wait_quantized + distance
             else:
                 return wait_quantized + unit_normal
@@ -468,8 +479,15 @@ class Sequence:
             self.denominator) + ", Elements: " + str(self.elements) + ")"
 
 
+class SequenceAbsolute(Sequence):
+
+    def __init__(self, numerator=4, denominator=4):
+        super().__init__(numerator, denominator)
+
+
 class Musical:
     std_velocity = 64
+    internal_ticks = 24
     ticks_per_beat = 96
 
     def __init__(self, right_hand: Sequence, left_hand: Sequence, numerator=4, denominator=4):
@@ -488,7 +506,7 @@ class Musical:
         # Check if there are empty bars at the beginning
         wait_right = 0
         wait_right_velocity = Musical.std_velocity
-        tpb = Musical.ticks_per_beat
+        tpb = Musical.internal_ticks
         if seqr.elements[0].message_type == MessageType.wait:
             wait_right = seqr.elements[0].value
             wait_right_velocity = seqr.elements[0].velocity
@@ -534,7 +552,7 @@ class Musical:
 
 class Element:
 
-    def __init__(self, messagetype: MessageType, value: int, velocity: int):
+    def __init__(self, messagetype: MessageType, value: float, velocity: int):
         super().__init__()
         self.message_type = messagetype
         self.value = value
@@ -545,14 +563,6 @@ class Element:
 
     def __repr__(self) -> str:
         return self.__str__()
-
-    def to_neuron_representation(self):
-        if self.message_type == MessageType.wait:
-            return 0
-        elif self.message_type == MessageType.play:
-            return self.value - 20
-        elif self.message_type == MessageType.stop:
-            return self.value - 20 + 88
 
 
 class WrappedElement:

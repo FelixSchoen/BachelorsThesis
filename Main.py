@@ -24,8 +24,28 @@ def test():
 
 
 def asdf():
-    seq = mu.Sequence.from_midi_file(MidiFile("res/4-4/beethoven_op27_csmin_mo3_0.mid"))
-    mu.Sequence.stitch_together(seq.split()).to_midi_file().save("out/generated.mid")
+    seq = mu.Sequence.from_midi_file(MidiFile("res/q/quantized.mid"))
+    hash = set()
+    for element in seq.elements:
+        if element.message_type == MessageType.wait:
+            hash.add(element.value)
+
+    print(sorted(hash))
+
+    hash.clear()
+    for element in seq.elements:
+        if element.message_type == MessageType.wait:
+            hash.add(mu.Sequence.quantize_note(element.value))
+
+    print(sorted(hash))
+
+def quantest():
+    list = [8, 10, 14]
+    nl = set()
+    for i in list:
+        nl.add(mu.Sequence.quantize_note(i))
+    print(sorted(nl))
+
 
 if __name__ == '__main__':
     asdf()

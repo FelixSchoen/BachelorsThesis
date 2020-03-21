@@ -24,10 +24,10 @@ def test():
 
 
 def asdf():
-    seq = mu.Sequence.from_midi_file(MidiFile("res/4-4/beethoven_op27_csmin_mo3_0.mid"))
+    seq = mu.Sequence.from_midi_file(MidiFile("res/q/rachma1.mid"))
     abs = seq.to_absolute_sequence()
     abs.quantize()
-    abs.to_relative_sequence().to_midi_file().save("out/generated.mid")
+    abs.to_relative_sequence().to_midi_file().save("out/generated1.mid")
 
 
 

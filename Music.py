@@ -127,14 +127,7 @@ class Sequence:
                 if message.type == "note_on" or message.type == "note_off" or message.type == "control_change":
                     wait_buffer += message.time * modifier
                     if wait_buffer != 0 and message.type != "control_change":
-                        # wait_buffer = Sequence.quantize_note(wait_buffer)
-                        # Generate Wait Message
-                        # while wait_buffer > ticks:
-                        #     wait_buffer -= ticks
-                        #     sequence.elements.append(
-                        #         Element(MessageType.wait, ticks, message.velocity))
-                        sequence.elements.append(
-                            Element(MessageType.wait, wait_buffer, message.velocity))
+                        sequence.elements.extend(Sequence.util_generate_wait_messages(wait_buffer))
                         wait_buffer = 0
 
                 if message.type == "note_on":
@@ -447,6 +440,16 @@ class Sequence:
         return last_notes
 
     @staticmethod
+    def util_generate_wait_messages(amount: int) -> list:
+        list = []
+        ticks = Musical.internal_ticks
+        for i in range(0, int(amount // ticks)):
+            list.append(Element(MessageType.wait, ticks, Musical.std_velocity))
+        if amount % ticks > 0:
+            list.append(Element(MessageType.wait, amount % ticks, Musical.std_velocity))
+        return list
+
+    @staticmethod
     def quantize_value(wait: int):
         tpb = Musical.internal_ticks
         unit_normal = tpb / 8
@@ -490,7 +493,7 @@ class SequenceAbsolute(Sequence):
 
         for element in sorted(self.elements, key=lambda item: item[1]):
             if element[1] > wait:
-                relative.elements.append(Element(MessageType.wait, element[1]-wait, Musical.std_velocity))
+                relative.elements.append(Element(MessageType.wait, element[1] - wait, Musical.std_velocity))
                 wait = element[1]
             relative.elements.append(element[0])
 
@@ -501,7 +504,7 @@ class SequenceAbsolute(Sequence):
             if element[0].message_type == MessageType.wait:
                 index = self.elements.index(element)
                 self.elements.pop(index)
-                quantized_element = Element(element.message_type, mu.Sequence.quantize_value(element.value), element.velocity)
+                quantized_element = Element(element.message_type, self.quantize_value(element.value), element.velocity)
                 self.elements.insert(index, quantized_element)
 
 

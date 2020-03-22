@@ -48,6 +48,10 @@ class SequenceTest(unittest.TestCase):
         midi_file = compositions[0].to_midi_file()
         midi_file.save("generated.mid")
 
+    def test_sequence_split(self):
+        seq_tuple = self.sequence.to_absolute_sequence().quantize().to_relative_sequence().split(96)
+        print(seq_tuple[0])
+
 
 if __name__ == '__main__':
     unittest.main()

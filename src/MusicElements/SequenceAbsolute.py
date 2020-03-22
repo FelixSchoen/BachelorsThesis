@@ -43,14 +43,14 @@ class SequenceAbsolute(AbstractSequence):
 
         if wait_quantized + distance > wait:
             if wait_quantized + distance / 2 >= wait:
-                return wait_quantized
+                return int(wait_quantized)
             else:
-                return wait_quantized + distance
+                return int(wait_quantized + distance)
         else:
             if wait_quantized + distance + remainder / 2 > wait:
-                return wait_quantized + distance
+                return int(wait_quantized + distance)
             else:
-                return wait_quantized + unit_normal
+                return int(wait_quantized + unit_normal)
 
     def merge(self, sequence: SequenceAbsolute) -> SequenceAbsolute:
         merged_elements = []

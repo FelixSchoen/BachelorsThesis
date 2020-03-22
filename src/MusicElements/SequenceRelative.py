@@ -233,3 +233,59 @@ class SequenceRelative(AbstractSequence):
                 last_notes.append(Note.from_note_value(element.value % 12))
 
         return last_notes
+
+    def split(self, capacity: int) -> tuple:
+        # Queue for elements to cover
+        initial_queue = self.elements.copy()
+        # Queue for elements to carry to tail sequence (e.g. (play, stop, wait) carries (play))
+        carry_queue = list()
+
+        # Head contains elements of length = capacity
+        seq_head = SequenceRelative()
+        # Tail contains all other elements
+        seq_tail = None
+
+        seq = seq_head
+
+        # Duration that has passed up to now
+        duration = 0
+        # Determines if carry queue is to be used (e.g. switch to new section)
+        flag_carry = False
+
+        while len(initial_queue) != 0 or len(carry_queue) != 0:
+            if flag_carry and seq_tail is None:
+                # Second sequence is not empty
+                seq_tail = SequenceRelative()
+                seq = seq_tail
+            if len(carry_queue) != 0 and flag_carry:
+                element = carry_queue.pop(0)
+            else:
+                flag_carry = False
+                element = initial_queue.pop(0)
+
+            if element.message_type == MessageType.play:
+                if duration < capacity or capacity == -1:
+                    # Can play note
+                    seq.elements.append(element)
+                else:
+                    # Carry to tail
+                    carry_queue.append(element)
+            elif element.message_type == MessageType.stop:
+                seq.elements.append(element)
+            elif element.message_type == MessageType.wait:
+                if duration + element.value <= capacity or capacity == -1:
+                    # Fits in its entirety
+                    duration += element.value
+                    seq.elements.append(element)
+                else:
+                    # Wait does not fit entirely
+                    fit_duration = capacity - duration
+                    remainder_duration = element.value - fit_duration
+                    duration += fit_duration
+                    if fit_duration > 0:
+                        seq.elements.append(Element(MessageType.wait, int(fit_duration), element.velocity))
+                    carry_queue.append(Element(MessageType.wait, int(remainder_duration), element.velocity))
+                    flag_carry = True
+                    capacity = -1
+
+        return seq_head, seq_tail

@@ -50,10 +50,12 @@ class Composition:
 
     def to_midi_file(self) -> MidiFile:
         midi_file = MidiFile()
+
         track_right = self.right_hand.to_midi_track()
         track_right.insert(0, MetaMessage("track_name", name="Right Hand\x00", time=0))
         track_left = self.left_hand.to_midi_track()
         track_left.insert(0, MetaMessage("track_name", name="Left Hand\x00", time=0))
+
         midi_file.tracks.append(track_right)
         midi_file.tracks.append(track_left)
 

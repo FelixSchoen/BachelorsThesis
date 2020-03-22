@@ -18,7 +18,7 @@ def print_midi_file(midi_file: MidiFile, amount=-1) -> None:
     for j, track in enumerate(midi_file.tracks):
         for i, message in enumerate(track):
             if not message.is_meta: continue
-            if message.type == "set_tempo" or message.type == "end_of_track" or message.type == "midi_port": continue
+            #if message.type == "set_tempo" or message.type == "end_of_track" or message.type == "midi_port": continue
             if i >= amount != -1:
                 break
             print("Track " + str(j) + ": " + str(message))
@@ -42,4 +42,4 @@ def temp():
     midi_file.save("../out/generated.mid")
 
 if __name__ == '__main__':
-    temp()
+    print_midi_file(MidiFile("../res/beethoven_op27_mo3.mid"))

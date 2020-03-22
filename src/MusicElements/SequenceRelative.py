@@ -16,6 +16,9 @@ class SequenceRelative(AbstractSequence):
         wait_buffer = 0
 
         for message in midi_track:
+            if message.type == "track_name":
+                sequence.name = message.name
+
             # Generate wait messages
             if message.type == "note_on" or message.type == "note_off" or message.type == "control_change":
                 wait_buffer += message.time * modifier

@@ -24,17 +24,13 @@ class SequenceAbsolute(AbstractSequence):
         quantized_elements = []
 
         for element in self.elements:
-            if element[0].message_type == MessageType.wait:
-                quantized_elements.append(
-                    Element(MessageType.wait, self.quantize_value(element.value), element.velocity))
-            else:
-                quantized_elements.append(element)
+            quantized_elements.append((element[0], self.quantize_value(element[1])))
 
         self.elements = quantized_elements
         return self
 
     @staticmethod
-    def quantize_value(wait: int):
+    def quantize_value(wait: float) -> int:
         unit_normal = internal_ticks / 8
         unit_triplet = unit_normal * 2 / 3
 
@@ -66,10 +62,10 @@ class SequenceAbsolute(AbstractSequence):
             el_this = self.elements[i] if i < len(self.elements) else None
             el_that = sequence.elements[j] if j < len(sequence.elements) else None
 
-            if el_that is None or el_this[1] < el_that[1]:
+            if el_that is None or (el_this is not None and el_this[1] < el_that[1]):
                 merged_elements.append(el_this)
                 i += 1
-            elif el_this is None or el_that[1] < el_this[1]:
+            elif el_this is None or (el_that is not None and el_that[1] < el_this[1]):
                 merged_elements.append(el_that)
                 j += 1
             else:

@@ -234,7 +234,7 @@ class SequenceRelative(AbstractSequence):
 
         return last_notes
 
-    def split(self, capacity: int) -> tuple:
+    def split(self, capacity: int) -> tuple[SequenceRelative, SequenceRelative]:
         # Queue for elements to cover
         initial_queue = self.elements.copy()
         # Queue for elements to carry to tail sequence (e.g. (play, stop, wait) carries (play))

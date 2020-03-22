@@ -46,12 +46,23 @@ class SequenceTest(unittest.TestCase):
     def test_composition_to_midi_file(self):
         compositions = Composition.from_midi_file(self.midi_file)
         midi_file = compositions[0].to_midi_file()
-        midi_file.save("generated.mid")
 
     def test_sequence_split(self):
         seq_tuple = self.sequence.to_absolute_sequence().quantize().to_relative_sequence().split(96)
         print(seq_tuple[0])
 
+    def test_composition_get_timings(self):
+        print(Composition.get_split_timing(self.midi_file.tracks[0]))
+
+    def test_composition_split(self):
+        composition = Composition.from_midi_file(self.midi_file)
+        print(composition)
+
+    def test_debug_split(self):
+        split = Composition.get_split_timing(self.midi_file.tracks[0])
+        splitted = self.sequence.split(split[1][0] * (internal_ticks/external_ticks))
+        print(splitted[0])
+        print(splitted[1])
 
 if __name__ == '__main__':
     unittest.main()

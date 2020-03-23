@@ -1,8 +1,7 @@
 from __future__ import annotations
-
 from mido import MidiTrack, Message
-
 from src.MusicElements import *
+import pickle
 
 
 class SequenceRelative(AbstractSequence):
@@ -56,6 +55,16 @@ class SequenceRelative(AbstractSequence):
 
         return track
 
+    @staticmethod
+    def from_file(filename: str) -> SequenceRelative:
+        with open(filename, "rb") as input:
+            sequence = pickle.load(input)
+        return sequence
+
+    def to_file(self, filename: str):
+        with open(filename, "wb") as output:
+            pickle.dump(self, output, pickle.HIGHEST_PROTOCOL)
+
     def to_absolute_sequence(self) -> SequenceAbsolute:
         elements = {}
         seq_absolute = SequenceAbsolute(self.numerator, self.denominator)
@@ -82,6 +91,17 @@ class SequenceRelative(AbstractSequence):
                 element.value -= 12
             self.elements.insert(i, element)
         return self
+
+    @staticmethod
+    def stitch(sequences: list[SequenceRelative]) -> SequenceRelative:
+        sequence = SequenceRelative()
+        sequence.numerator = sequences[0].numerator
+        sequence.denominator = sequences[0].denominator
+
+        for seq in sequences:
+            sequence.elements.extend(seq.elements)
+
+        return sequence
 
     @staticmethod
     def average_complexity(sequences: list):
@@ -289,3 +309,23 @@ class SequenceRelative(AbstractSequence):
                     capacity = -1
 
         return seq_head, seq_tail
+
+    def split_bars(self) -> list[SequenceRelative]:
+        sequences = []
+        split_capacity = internal_ticks * 4 * (self.numerator / self.denominator)
+        split = self.split(split_capacity)
+
+        while split[1] is not None:
+            sequences.append(split[0])
+            split = split[1].split(split_capacity)
+
+        if split[0] is not None:
+            sequences.append(split[0])
+
+        return sequences
+
+    def is_empty(self) -> bool:
+        for element in self.elements:
+            if element.message_type == MessageType.play or element.message_type == MessageType.stop:
+                return False
+        return True

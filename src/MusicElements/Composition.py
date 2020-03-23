@@ -128,6 +128,10 @@ class Composition:
 
         return timings
 
+    def transpose(self, steps: int):
+        self.right_hand.transpose(steps)
+        self.left_hand.transpose(steps)
+
     def __str__(self) -> str:
         return "(Numerator: " + str(self.numerator) + ", Denominator: " + str(
             self.denominator) + "\nRight Hand: " + str(self.right_hand) + "\nLeft Hand: " + str(self.left_hand) + ")"

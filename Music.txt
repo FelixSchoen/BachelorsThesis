@@ -28,13 +28,6 @@ class Sequence:
         sequence.denominator = denominator
         return sequence
 
-    def to_midi_file(self) -> MidiFile:
-        midi_file = MidiFile()
-        tpb = Musical.ticks_per_beat
-        midi_file.ticks_per_beat = tpb
-        midi_file.type = 1
-        midi_file.tracks.append(self.to_midi_track())
-        return midi_file
 
     def detect_ideal_scale(self) -> (list, list):
         mismatch = dict()
@@ -53,70 +46,3 @@ class Sequence:
         percentage = list(map(lambda x: 1 - x[1] / len(self.elements), guess))
 
         return sorted(mismatch.items(), key=lambda item: item[1]), percentage
-
-
-
-
-class Musical:
-    std_velocity = 64
-    internal_ticks = 24
-    ticks_per_beat = 96
-
-    def __init__(self, right_hand: Sequence, left_hand: Sequence, numerator=4, denominator=4):
-        self.right_hand = right_hand
-        self.left_hand = left_hand
-        self.numerator = numerator
-        self.denominator = denominator
-
-    @staticmethod
-    def from_midi_file(right_hand: MidiFile, left_hand: MidiFile):
-        seqr = Sequence.from_midi_file(right_hand)
-        seql = Sequence.from_midi_file(left_hand)
-        numerator = np.lcm(seqr.numerator, seql.numerator)
-        denominator = np.lcm(seqr.denominator, seql.denominator)
-
-        # Check if there are empty bars at the beginning
-        wait_right = 0
-        wait_right_velocity = Musical.std_velocity
-        tpb = Musical.internal_ticks
-        if seqr.elements[0].message_type == MessageType.wait:
-            wait_right = seqr.elements[0].value
-            wait_right_velocity = seqr.elements[0].velocity
-        wait_left = 0
-        wait_left_velocity = 64
-        if seql.elements[0].message_type == MessageType.wait:
-            wait_left = seql.elements[0].value
-            wait_left_velocity = seql.elements[0].velocity
-
-        if wait_right > 0 and wait_left > 0:
-            while wait_right - 4 * tpb >= 0 and wait_left - 4 * tpb >= 0:
-                wait_right -= 4 * tpb
-                wait_left -= 4 * tpb
-            seqr.elements.pop(0)
-            seqr.elements.append(Element(MessageType.wait, wait_right, wait_right_velocity))
-            seql.elements.pop(0)
-            seql.elements.append(Element(MessageType.wait, wait_left, wait_left_velocity))
-
-        musical = Musical(seqr, seql, numerator, denominator)
-        return musical
-
-    def to_midi_file(self):
-        midi_file = MidiFile()
-        tpb = Musical.ticks_per_beat
-        midi_file.ticks_per_beat = tpb
-        midi_file.type = 1
-
-        right_track = self.right_hand.to_midi_track()
-        right_track.insert(0, MetaMessage("track_name", name="Right Hand\x00", time=0))
-        left_track = self.left_hand.to_midi_track()
-        left_track.insert(0, MetaMessage("track_name", name="Left Hand\x00", time=0))
-        midi_file.tracks.append(right_track)
-        midi_file.tracks.append(left_track)
-        return midi_file
-
-    def detect_scale(self):
-        return self.right_hand.detect_ideal_scale(), self.left_hand.detect_ideal_scale()
-
-    def transpose(self, steps: int):
-        self.right_hand.transpose(steps)
-        self.left_hand.transpose(steps)

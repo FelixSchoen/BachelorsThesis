@@ -34,11 +34,12 @@ class SequenceAbsolute(AbstractSequence):
         unit_normal = internal_ticks / 8
         unit_triplet = unit_normal * 2 / 3
 
+        # Steps are used to track position of the notes
         step_normal = (wait // unit_normal) % 2
         step_triplet = (wait // unit_triplet) % 3
         wait_quantized = unit_normal * (wait // unit_normal)
 
-        distance = (step_triplet * unit_triplet) - (step_normal * unit_normal)
+        distance = (2 - step_normal) * unit_normal - (2 - step_normal) * unit_triplet
         remainder = unit_normal - distance
 
         if wait_quantized + distance > wait:

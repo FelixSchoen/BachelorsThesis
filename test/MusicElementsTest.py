@@ -1,4 +1,5 @@
 import unittest
+import os
 from src.MusicElements import *
 from mido import MidiFile
 
@@ -58,11 +59,39 @@ class SequenceTest(unittest.TestCase):
         composition = Composition.from_midi_file(self.midi_file)
         print(composition)
 
-    def test_debug_split(self):
-        split = Composition.get_split_timing(self.midi_file.tracks[0])
-        splitted = self.sequence.split(split[1][0] * (internal_ticks/external_ticks))
-        print(splitted[0])
-        print(splitted[1])
+    def test_split_bars(self):
+        sequences = self.sequence.to_absolute_sequence().quantize().to_relative_sequence().adjust().split_bars()
+        print(sequences)
+
+    def test_to_file(self):
+        filename = "..\out/1.pkl"
+        self.sequence.to_file(filename)
+        os.remove(filename)
+
+    def test_from_file(self):
+        filename = "..\out/1.pkl"
+        self.sequence.to_file(filename)
+        seq = SequenceRelative.from_file(filename)
+        print(seq)
+        os.remove(filename)
+
+    def test_split_then_stitch(self):
+        split = self.sequence.to_absolute_sequence().quantize().to_relative_sequence().split_bars()
+        seq = SequenceRelative.stitch(split)
+        print(seq)
+        self.save_seq_to_file("..\out/stitched.mid", seq)
+
+    def test_quantize(self):
+        for i in range(0, 50):
+            print(str(i / 2) + ": " + str(SequenceAbsolute.quantize_value(i / 2)))
+
+    @staticmethod
+    def save_seq_to_file(filename: str, seq: SequenceRelative):
+        midifile = MidiFile()
+        track = seq.to_midi_track()
+        midifile.tracks.append(track)
+        midifile.save(filename)
+
 
 if __name__ == '__main__':
     unittest.main()

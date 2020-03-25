@@ -212,56 +212,21 @@ class SequenceRelative(AbstractSequence):
         return self.util_adjust_rating(value)
 
     def complexity_pattern(self):
+        original_representation = "+1+2+2+3+1+2+2+3+1+2+2+3+1+2+2+3"
         original_regex = r"(?P<pattern>(?:[+-]\d+){len})[-+\d]*(?:(?P=pattern)[-+\d]*){pat}"
-        original_representation = "+7+7+1+2+3+1+2+3+4+5+6+4+5+6"
+        regex = original_regex.format(len="{" + str(1) + "}", pat="{" + str(1) + "}")
         results = []
-
-        iter_iteration_pattern_length = 2
-        iter_iteration_pattern_amount = 1
-        iter_iteration_coverage = -math.inf
 
         iteration_index = 0
         iteration_representation = original_representation
-        iteration_representation_length = self.util_count_notes_relative_representation(iteration_representation)
-        iteration_regex = original_regex.format(len="{" + str(iter_iteration_pattern_length) + "}",
-                                                pat="{" + str(iter_iteration_pattern_amount) + "}")
 
-        while re.compile(iteration_regex).search(iteration_representation):
+        while re.compile(regex).search(iteration_representation):
             # While loop to check for multiple patterns
-            while re.compile(iteration_regex).search(iteration_representation):
-                while re.compile(iteration_regex).search(iteration_representation):
-                    # While loop to check for single pattern on current representation iteration
-                    match = re.compile(iteration_regex).search(iteration_representation)
-                    local_group = match.groupdict().get("pattern")
-                    local_group_length = self.util_count_notes_relative_representation(local_group)
-                    local_pattern_span = local_group_length * (iter_iteration_pattern_amount + 1)
-
-                    local_coverage = local_pattern_span / iteration_representation_length
-
-                    if local_coverage >= iter_iteration_coverage:
-                        # Found better fitting pattern
-                        if len(results) <= iteration_index:
-                            results.append(None)
-                        results[iteration_index] = (
-                            iteration_representation, local_group, iter_iteration_pattern_amount + 1)
-
-                    iter_iteration_pattern_amount += 1
-                    iteration_regex = original_regex.format(len="{" + str(iter_iteration_pattern_length) + "}",
-                                                            pat="{" + str(iter_iteration_pattern_amount) + "}")
-
-                iter_iteration_pattern_length += 1
-                iter_iteration_pattern_amount = 1
-                iteration_regex = original_regex.format(len="{" + str(iter_iteration_pattern_length) + "}",
-                                                        pat="{" + str(iter_iteration_pattern_amount) + "}")
+            group, amount = self.util_recognize_pattern(original_regex, iteration_representation)
+            results.append((iteration_representation, group, amount))
 
             # Search for other patterns
-            iter_iteration_pattern_length = 1
-            iter_iteration_pattern_amount = 1
-            iter_iteration_coverage = -math.inf
             iteration_representation = iteration_representation.replace(results[iteration_index][1], "")
-            iteration_representation_length = self.util_count_notes_relative_representation(iteration_representation)
-            iteration_regex = original_regex.format(len="{" + str(iter_iteration_pattern_length) + "}",
-                                                    pat="{" + str(iter_iteration_pattern_amount) + "}")
             iteration_index += 1
 
         coverage = 0
@@ -270,50 +235,53 @@ class SequenceRelative(AbstractSequence):
             local_coverage = (self.util_count_notes_relative_representation(result[1]) * result[
                 2]) / self.util_count_notes_relative_representation(result[0])
             coverage += local_coverage * remaining
-            remaining -= coverage
+            remaining = 1 - coverage
             print(
                 "Representation: {rep}\n\tGroup: {grp}\n\tTimes: {tms}\n\tLocal Coverage: {lcv}\n\tGlobal Coverage: {gcv}".format(
                     rep=result[0], grp=result[1],
                     tms=result[2], lcv=local_coverage, gcv=coverage))
 
-    def complexity_pattern_recognition(self):
-        """
-        Complexity analysis based on the amount and length of recognized patterns.
-        """
-        regex_raw = r"(?P<pattern>(?:[+-]\d+)+)[-+\d]*(?:(?P=pattern)[-+\d]*){num}"
+    @staticmethod
+    def util_recognize_pattern(regex_template: str, representation: str) -> (str, int):
+        sr = SequenceRelative
+        representation_length = SequenceRelative.util_count_notes_relative_representation(representation)
+        pattern_length = 1
         pattern_amount = 1
-        regex = regex_raw.format(num="{" + str(pattern_amount) + "}")
-        relative_representation = "+1+2+3+1+2+3+4+5+6+4+5+6"
+        pattern_coverage = -math.inf
+        iteration_regex = regex_template.format(len="{" + str(pattern_length) + "}",
+                                                pat="{" + str(pattern_amount) + "}")
 
-        representation_size = self.util_count_notes_relative_representation(relative_representation)
-        max_pattern_coverage = -math.inf
-        max_pattern_length = math.inf
-        max_pattern_amount = -math.inf
+        result = None
 
-        test = relative_representation
+        while re.compile(iteration_regex).search(representation):
+            # Increase length of pattern
+            while re.compile(iteration_regex).search(representation):
+                # Increase occurrences of pattern
+                match = re.compile(iteration_regex).search(representation)
+                local_group = match.groupdict().get("pattern")
+                local_group_length = sr.util_count_notes_relative_representation(local_group)
+                local_pattern_span = local_group_length * (pattern_amount + 1)
 
-        while re.compile(regex).search(relative_representation):
-            match = re.compile(regex).match(relative_representation)
-            local_length = self.util_count_notes_relative_representation(match.groupdict().get("pattern"))
-            local_size = local_length * (pattern_amount + 1)
+                local_coverage = local_pattern_span / representation_length
 
-            local_coverage = local_size / representation_size
+                inherent_pattern = sr.util_recognize_pattern(regex_template, local_group)
+                if local_coverage >= pattern_coverage and (
+                        inherent_pattern is None or sr.util_count_notes_relative_representation(inherent_pattern[0]) *
+                        inherent_pattern[1] < sr.util_count_notes_relative_representation(local_group)):
+                    # Found better fitting pattern
+                    pattern_coverage = local_coverage
+                    result = (local_group, pattern_amount + 1)
 
-            # lel
-            group = match.groupdict().get("pattern")
-            test = relative_representation.replace(group, "")
-            print("Group: {grp}, Test: {test}".format(grp=group, test=test))
-            # lel end
+                pattern_amount += 1
+                iteration_regex = regex_template.format(len="{" + str(pattern_length) + "}",
+                                                        pat="{" + str(pattern_amount) + "}")
 
-            if local_coverage >= max_pattern_coverage:
-                max_pattern_coverage = local_coverage
-                max_pattern_length = local_length
-                max_pattern_amount = pattern_amount
+            pattern_length += 1
+            pattern_amount = 1
+            iteration_regex = regex_template.format(len="{" + str(pattern_length) + "}",
+                                                    pat="{" + str(pattern_amount) + "}")
 
-            pattern_amount += 1
-            regex = regex_raw.format(num="{" + str(pattern_amount) + "}")
-
-        print("Coverage: {cov}, Length: {lgt}".format(cov=max_pattern_coverage, lgt=max_pattern_length))
+        return result
 
     @staticmethod
     def util_adjust_rating(value: float):

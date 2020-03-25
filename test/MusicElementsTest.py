@@ -89,8 +89,9 @@ class SequenceTest(unittest.TestCase):
         print(self.sequence.util_relative_representation())
 
     def test_temp(self):
-        seq = self.sequence
-        seq.complexity_pattern()
+        seq = self.sequenceEasy.split_bars()
+        print(seq[0].util_relative_representation())
+        seq[0].complexity_pattern()
 
     @staticmethod
     def save_seq_to_file(filename: str, seq: SequenceRelative):

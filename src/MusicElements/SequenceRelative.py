@@ -2,6 +2,8 @@ from __future__ import annotations
 from mido import MidiTrack, Message
 from src.MusicElements import *
 import pickle
+import re
+import math
 
 
 class SequenceRelative(AbstractSequence):
@@ -123,7 +125,7 @@ class SequenceRelative(AbstractSequence):
         return self.complexity_breakdown()[0]
 
     def complexity_breakdown(self):
-        complex_note_values = self.__complexity_note_values()
+        complex_note_values = self.__complexity_wait_time()
         weight_note_values = 7
         complex_note_classes = self.__complexity_note_classes()
         weight_note_classes = 6
@@ -141,7 +143,11 @@ class SequenceRelative(AbstractSequence):
 
         return complexity, dict
 
-    def __complexity_note_values(self):
+    def __complexity_wait_time(self):
+        """
+        Complexity analysis based on the average wait time. A shorter wait time implies lower note values, thus constituting
+        a more difficult song.
+        """
         time = 0
         occurrences = 0
 
@@ -149,13 +155,17 @@ class SequenceRelative(AbstractSequence):
             if element.message_type == MessageType.wait:
                 time += element.value
                 occurrences += 1
-        average_time = time / occurrences if occurrences else time
+        average_wait_time = time / occurrences if occurrences else time
 
-        x = average_time
+        x = average_wait_time
         value = 6 - 0.1 * x + 8.5E-4 * x ** 2 - 2.425E-6 * x ** 3
         return self.util_adjust_rating(value)
 
     def __complexity_note_classes(self):
+        """
+        Complexity analysis based on the amount of different note classes. A higher amount of unique note classes constitutes
+        a higher difficulty rating.
+        """
         classes = set()
 
         for element in self.elements:
@@ -163,20 +173,28 @@ class SequenceRelative(AbstractSequence):
                 classes.add(element.value)
 
         x = len(classes)
-        value = 1 / 3 * x + 1 / 3
+        value = (1 / 3 * x + 1 / 3) / (self.numerator / self.denominator)
         return self.util_adjust_rating(value)
 
     def __complexity_note_amount(self):
+        """
+        Complexity analysis based on the total amount of notes played. Dependant on a function judging the complexity
+        compared to the time signature of the bar.
+        """
         amount = 0
         for element in self.elements:
             if element.message_type == MessageType.play:
                 amount += 1
 
         x = amount
-        value = -0.1 + 3.25E-1 * x - 1.0E-2 * x ** 2 + 1.5E-4 * x ** 3
+        value = (-0.1 + 3.25E-1 * x - 1.0E-2 * x ** 2 + 1.5E-4 * x ** 3) / (self.numerator / self.denominator)
         return self.util_adjust_rating(value)
 
     def __complexity_concurrent_notes(self):
+        """
+        Complexity analysis based on the average amount of notes played at the same time, where more notes constitute a
+        higher complexity rating.
+        """
         notes = 0
         occurrences = 0
         last_element = None
@@ -192,6 +210,110 @@ class SequenceRelative(AbstractSequence):
         value = 5 - 1.65E1 * x + 1.925E1 * x ** 2 - 8 * x ** 3 + 1.15 * x ** 4
         value *= self.__complexity_note_amount() / 3
         return self.util_adjust_rating(value)
+
+    def complexity_pattern(self):
+        original_regex = r"(?P<pattern>(?:[+-]\d+){len})[-+\d]*(?:(?P=pattern)[-+\d]*){pat}"
+        original_representation = "+7+7+1+2+3+1+2+3+4+5+6+4+5+6"
+        results = []
+
+        iter_iteration_pattern_length = 2
+        iter_iteration_pattern_amount = 1
+        iter_iteration_coverage = -math.inf
+
+        iteration_index = 0
+        iteration_representation = original_representation
+        iteration_representation_length = self.util_count_notes_relative_representation(iteration_representation)
+        iteration_regex = original_regex.format(len="{" + str(iter_iteration_pattern_length) + "}",
+                                                pat="{" + str(iter_iteration_pattern_amount) + "}")
+
+        while re.compile(iteration_regex).search(iteration_representation):
+            # While loop to check for multiple patterns
+            while re.compile(iteration_regex).search(iteration_representation):
+                while re.compile(iteration_regex).search(iteration_representation):
+                    # While loop to check for single pattern on current representation iteration
+                    match = re.compile(iteration_regex).search(iteration_representation)
+                    local_group = match.groupdict().get("pattern")
+                    local_group_length = self.util_count_notes_relative_representation(local_group)
+                    local_pattern_span = local_group_length * (iter_iteration_pattern_amount + 1)
+
+                    local_coverage = local_pattern_span / iteration_representation_length
+
+                    if local_coverage >= iter_iteration_coverage:
+                        # Found better fitting pattern
+                        if len(results) <= iteration_index:
+                            results.append(None)
+                        results[iteration_index] = (
+                            iteration_representation, local_group, iter_iteration_pattern_amount + 1)
+
+                    iter_iteration_pattern_amount += 1
+                    iteration_regex = original_regex.format(len="{" + str(iter_iteration_pattern_length) + "}",
+                                                            pat="{" + str(iter_iteration_pattern_amount) + "}")
+
+                iter_iteration_pattern_length += 1
+                iter_iteration_pattern_amount = 1
+                iteration_regex = original_regex.format(len="{" + str(iter_iteration_pattern_length) + "}",
+                                                        pat="{" + str(iter_iteration_pattern_amount) + "}")
+
+            # Search for other patterns
+            iter_iteration_pattern_length = 1
+            iter_iteration_pattern_amount = 1
+            iter_iteration_coverage = -math.inf
+            iteration_representation = iteration_representation.replace(results[iteration_index][1], "")
+            iteration_representation_length = self.util_count_notes_relative_representation(iteration_representation)
+            iteration_regex = original_regex.format(len="{" + str(iter_iteration_pattern_length) + "}",
+                                                    pat="{" + str(iter_iteration_pattern_amount) + "}")
+            iteration_index += 1
+
+        coverage = 0
+        remaining = 1
+        for result in results:
+            local_coverage = (self.util_count_notes_relative_representation(result[1]) * result[
+                2]) / self.util_count_notes_relative_representation(result[0])
+            coverage += local_coverage * remaining
+            remaining -= coverage
+            print(
+                "Representation: {rep}\n\tGroup: {grp}\n\tTimes: {tms}\n\tLocal Coverage: {lcv}\n\tGlobal Coverage: {gcv}".format(
+                    rep=result[0], grp=result[1],
+                    tms=result[2], lcv=local_coverage, gcv=coverage))
+
+    def complexity_pattern_recognition(self):
+        """
+        Complexity analysis based on the amount and length of recognized patterns.
+        """
+        regex_raw = r"(?P<pattern>(?:[+-]\d+)+)[-+\d]*(?:(?P=pattern)[-+\d]*){num}"
+        pattern_amount = 1
+        regex = regex_raw.format(num="{" + str(pattern_amount) + "}")
+        relative_representation = "+1+2+3+1+2+3+4+5+6+4+5+6"
+
+        representation_size = self.util_count_notes_relative_representation(relative_representation)
+        max_pattern_coverage = -math.inf
+        max_pattern_length = math.inf
+        max_pattern_amount = -math.inf
+
+        test = relative_representation
+
+        while re.compile(regex).search(relative_representation):
+            match = re.compile(regex).match(relative_representation)
+            local_length = self.util_count_notes_relative_representation(match.groupdict().get("pattern"))
+            local_size = local_length * (pattern_amount + 1)
+
+            local_coverage = local_size / representation_size
+
+            # lel
+            group = match.groupdict().get("pattern")
+            test = relative_representation.replace(group, "")
+            print("Group: {grp}, Test: {test}".format(grp=group, test=test))
+            # lel end
+
+            if local_coverage >= max_pattern_coverage:
+                max_pattern_coverage = local_coverage
+                max_pattern_length = local_length
+                max_pattern_amount = pattern_amount
+
+            pattern_amount += 1
+            regex = regex_raw.format(num="{" + str(pattern_amount) + "}")
+
+        print("Coverage: {cov}, Length: {lgt}".format(cov=max_pattern_coverage, lgt=max_pattern_length))
 
     @staticmethod
     def util_adjust_rating(value: float):
@@ -253,6 +375,23 @@ class SequenceRelative(AbstractSequence):
                 last_notes.append(Note.from_note_value(element.value % 12))
 
         return last_notes
+
+    def util_relative_representation(self) -> list[str]:
+        relative_representation = []
+        last_value = -1
+        string = "{0:+}"
+
+        for element in self.elements:
+            if element.message_type == MessageType.play:
+                if last_value != -1:
+                    relative_representation.append(string.format(element.value - last_value))
+                last_value = element.value
+
+        return relative_representation
+
+    @staticmethod
+    def util_count_notes_relative_representation(representation: str):
+        return representation.count("+") + representation.count("-")
 
     def split(self, capacity: int) -> tuple[SequenceRelative, SequenceRelative]:
         # Queue for elements to cover

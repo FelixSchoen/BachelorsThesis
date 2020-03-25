@@ -36,7 +36,6 @@ class SequenceAbsolute(AbstractSequence):
 
         # Steps are used to track position of the notes
         step_normal = (wait // unit_normal) % 2
-        step_triplet = (wait // unit_triplet) % 3
         wait_quantized = unit_normal * (wait // unit_normal)
 
         distance = (2 - step_normal) * unit_normal - (2 - step_normal) * unit_triplet

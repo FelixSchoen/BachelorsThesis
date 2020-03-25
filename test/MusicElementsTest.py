@@ -5,12 +5,16 @@ from mido import MidiFile
 
 
 class SequenceTest(unittest.TestCase):
-    midi_file = None
-    sequence = None
+    midi_file = MidiFile
+    midi_fileEasy = MidiFile
+    sequence = SequenceRelative
+    sequenceEasy = SequenceRelative
 
     def setUp(self):
         SequenceTest.midi_file = MidiFile("res/beethoven_op27_mo3.mid")
+        SequenceTest.midi_fileEasy = MidiFile("res/beethoven_op27_mo1.mid")
         SequenceTest.sequence = SequenceRelative.from_midi_track(self.midi_file.tracks[1])
+        SequenceTest.sequenceEasy = SequenceRelative.from_midi_track(self.midi_fileEasy.tracks[2])
 
     def test_sequence_creation(self):
         print(SequenceRelative.from_midi_track(self.midi_file.tracks[2]))
@@ -81,9 +85,12 @@ class SequenceTest(unittest.TestCase):
         print(seq)
         self.save_seq_to_file("..\out/stitched.mid", seq)
 
-    def test_quantize(self):
-        for i in range(0, 50):
-            print(str(i / 2) + ": " + str(SequenceAbsolute.quantize_value(i / 2)))
+    def test_relative_representation(self):
+        print(self.sequence.util_relative_representation())
+
+    def test_temp(self):
+        seq = self.sequence
+        seq.complexity_pattern()
 
     @staticmethod
     def save_seq_to_file(filename: str, seq: SequenceRelative):

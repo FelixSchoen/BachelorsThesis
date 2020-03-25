@@ -78,6 +78,34 @@ class Element:
         self.value = value
         self.velocity = velocity
 
+    def to_neuron_representation(self):
+        if self.message_type == MessageType.play:
+            return self.value - 21
+        elif self.message_type == MessageType.stop:
+            return self.value - 21 + 88
+        elif self.message_type == MessageType.wait:
+            switcher = {
+                2: 0,
+                3: 1,
+                4: 2,
+                6: 3,
+                8: 4,
+                9: 5,
+                10: 6,
+                12: 7,
+                14: 8,
+                15: 9,
+                16: 10,
+                18: 11,
+                20: 12,
+                21: 13,
+                22: 14,
+                24: 15
+            }
+
+            raw_val = switcher.get(self.value)
+            return raw_val + 88 * 2
+
     def __str__(self) -> str:
         return "(" + str(self.message_type) + str(self.value) + ")"
 

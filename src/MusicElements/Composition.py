@@ -10,6 +10,7 @@ class Composition:
         self.left_hand = left_hand
         self.numerator = numerator
         self.denominator = denominator
+        self.complexity
 
     @staticmethod
     def from_midi_file(midi_file: MidiFile) -> list[Composition]:

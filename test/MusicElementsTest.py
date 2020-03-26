@@ -86,12 +86,17 @@ class SequenceTest(unittest.TestCase):
         self.save_seq_to_file("..\out/stitched.mid", seq)
 
     def test_relative_representation(self):
-        print(self.sequence.util_relative_representation())
+        print(self.sequence.ut_repr_relative())
+
+    def test_calc_weighted_rating(self):
+        print(SequenceRelative.ut_calc_rating_weight(1, base=5, ceiling=1))
 
     def test_temp(self):
         seq = self.sequenceEasy.split_bars()
-        print(seq[0].util_relative_representation())
-        seq[0].complexity_pattern()
+        print(seq[0].ut_repr_absolute())
+        a1 = seq[0].complexity_pattern("".join(seq[0].ut_repr_absolute()))
+        a2 = seq[0].complexity_pattern("".join(seq[0].ut_repr_relative()))
+        print(SequenceRelative.ut_calc_weighted_sum([a1, a2], [3, 1]))
 
     @staticmethod
     def save_seq_to_file(filename: str, seq: SequenceRelative):

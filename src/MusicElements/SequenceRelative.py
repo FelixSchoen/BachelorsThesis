@@ -251,8 +251,8 @@ class SequenceRelative(AbstractSequence):
         complex_concurrent_notes = self.__complexity_concurrent_notes()
         weight_concurrent_notes = 3
 
-        complex_pattern_absolute = self.__complexity_pattern("".join(self.ut_repr_absolute()))
-        complex_pattern_relative = self.__complexity_pattern("".join(self.ut_repr_relative()))
+        complex_pattern_absolute = self.__complexity_pattern("".join(self.ut_repr_absolute()), min_pattern_length=2)
+        complex_pattern_relative = self.__complexity_pattern("".join(self.ut_repr_relative()), min_pattern_length=1)
         complex_pattern = self.ut_calc_weighted_sum(sorted([complex_pattern_absolute, complex_pattern_relative]),
                                                     [4, 1])
         weight_pattern = 2.5 * self.ut_calc_rating_weight(complex_pattern, 5, 1, factor=3)
@@ -341,10 +341,10 @@ class SequenceRelative(AbstractSequence):
         value *= self.__complexity_note_amount() / 3
         return self.ut_rating_adjust(value)
 
-    def __complexity_pattern(self, representation: str):
+    def __complexity_pattern(self, representation: str, min_pattern_length: int = 2):
         original_representation = representation
-        original_regex = r"(?P<pattern>(?:[+-.]\d+){len})[-+.\d]*(?:(?P=pattern)[-+.\d]*){pat}"
-        regex = original_regex.format(len="{" + str(1) + "}", pat="{" + str(1) + "}")
+        original_regex = r"(?P<pattern>(?:[-+.]\d+[-+.]){len})(?:[-+.]\d+[-+.])*(?:(?P=pattern)(?:[-+.]\d+[-+.])*){pat}"
+        regex = original_regex.format(len="{" + str(min_pattern_length) + "}", pat="{" + str(1) + "}")
         results = []
 
         iteration_index = 0
@@ -352,7 +352,7 @@ class SequenceRelative(AbstractSequence):
 
         while re.compile(regex).search(iteration_representation):
             # While loop to check for multiple patterns
-            group, amount = self.ut_pattern_recognition(original_regex, iteration_representation)
+            group, amount = self.ut_pattern_recognition(original_regex, iteration_representation, min_pattern_length)
             results.append((iteration_representation, group, amount))
 
             # Search for other patterns
@@ -372,24 +372,23 @@ class SequenceRelative(AbstractSequence):
             # Function 1: Judging group size
             # Function 2: Increase if group size is small (many small groups are not that easy to remember)
             local_difficulty = self.ut_minmax(
-                (-4E-1 + 7E-1 * x - 2.5E-2 * x ** 2 + 1.5E-3 * x ** 3) * self.ut_minmax(-0.1 * result[2] + 1.4, 1,
-                                                                                        1.2))
+                (-0.4 + 0.7 * x - 0.025 * x ** 2 + 0.0015 * x ** 3) * self.ut_minmax(-0.1 * result[2] + 1.4, 1, 1.2))
             difficulty_rating += local_difficulty * adjusted_coverage
-            # print(
-            #     "Representation: {rep}\n\tGroup: {grp}\n\tTimes: {tms}\n\tLocal Coverage: {lcv}\n\tAdjusted Local Coverage: {alcv}\n\tGlobal Coverage: {gcv}\n\tLocal Difficulty: {ldf}".format(
-            #         rep=result[0], grp=result[1],
-            #         tms=result[2], lcv=local_coverage,
-            #         alcv=adjusted_coverage, gcv=coverage, ldf=local_difficulty))
+            print(
+                "Representation: {rep}\n\tGroup: {grp}\n\tTimes: {tms}\n\tLocal Coverage: {lcv}\n\tAdjusted Local Coverage: {alcv}\n\tGlobal Coverage: {gcv}\n\tLocal Difficulty: {ldf}".format(
+                    rep=result[0], grp=result[1],
+                    tms=result[2], lcv=local_coverage,
+                    alcv=adjusted_coverage, gcv=coverage, ldf=local_difficulty))
         difficulty_rating += 5 * remaining
         return difficulty_rating
 
     # Utility Functions
 
     @staticmethod
-    def ut_pattern_recognition(regex_template: str, representation: str) -> (str, int):
+    def ut_pattern_recognition(regex_template: str, representation: str, min_pattern_length: int = 2) -> (str, int):
         sr = SequenceRelative
         representation_length = SequenceRelative.ut_repr_count(representation)
-        pattern_length = 1
+        pattern_length = min_pattern_length
         pattern_amount = 1
         pattern_coverage = -math.inf
         iteration_regex = regex_template.format(len="{" + str(pattern_length) + "}",
@@ -432,7 +431,7 @@ class SequenceRelative(AbstractSequence):
         return min(5, max(1, value))
 
     @staticmethod
-    def ut_minmax(value: int, minval: float = 1, maxval: float = 5):
+    def ut_minmax(value: float, minval: float = 1, maxval: float = 5):
         return min(maxval, max(minval, value))
 
     def ut_notes_first(self, steps: int) -> list:
@@ -462,7 +461,7 @@ class SequenceRelative(AbstractSequence):
     def ut_repr_relative(self) -> list[str]:
         relative_representation = []
         last_value = -1
-        string = "{0:+}"
+        string = "{0:+}."
 
         for element in self.elements:
             if element.message_type == MessageType.play:
@@ -474,7 +473,7 @@ class SequenceRelative(AbstractSequence):
 
     def ut_repr_absolute(self) -> list[str]:
         absolute_representation = []
-        string = ".{num}"
+        string = ".{num}."
 
         for element in self.elements:
             if element.message_type == MessageType.play:
@@ -484,7 +483,7 @@ class SequenceRelative(AbstractSequence):
 
     @staticmethod
     def ut_repr_count(representation: str):
-        return representation.count("+") + representation.count("-") + representation.count(".")
+        return (representation.count("+") + representation.count("-") + representation.count(".")) / 2
 
     @staticmethod
     def ut_calc_rating_weight(rating: float, base: float = 1, ceiling: float = 5, factor_base: float = 1,

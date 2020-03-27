@@ -93,10 +93,7 @@ class SequenceTest(unittest.TestCase):
 
     def test_temp(self):
         seq = self.sequenceEasy.split_bars()
-        print(seq[0].ut_repr_absolute())
-        a1 = seq[0].complexity_pattern("".join(seq[0].ut_repr_absolute()))
-        a2 = seq[0].complexity_pattern("".join(seq[0].ut_repr_relative()))
-        print(SequenceRelative.ut_calc_weighted_sum([a1, a2], [3, 1]))
+        print(seq[0].complexity_breakdown())
 
     @staticmethod
     def save_seq_to_file(filename: str, seq: SequenceRelative):

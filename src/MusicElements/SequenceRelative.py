@@ -242,40 +242,53 @@ class SequenceRelative(AbstractSequence):
         return self.complexity_breakdown()[0]
 
     def complexity_breakdown(self):
-        complex_note_values = self.__complexity_wait_time()
-        weight_note_values = 7
+        complex_note_values = self.__complexity_note_values()
+        weight_note_values = 5 * self.ut_calc_rating_weight(complex_note_values, factor=1.4)
+
         complex_note_classes = self.__complexity_note_classes()
-        weight_note_classes = 6
+        weight_note_classes = 5
+
         complex_concurrent_notes = self.__complexity_concurrent_notes()
         weight_concurrent_notes = 3
 
-        weight_sum = weight_note_values + weight_note_classes + weight_concurrent_notes
-        complexity = (weight_note_values / weight_sum * complex_note_values) + \
-                     (weight_note_classes / weight_sum * complex_note_classes) + \
-                     (weight_concurrent_notes / weight_sum * complex_concurrent_notes)
+        complex_pattern_absolute = self.__complexity_pattern("".join(self.ut_repr_absolute()))
+        complex_pattern_relative = self.__complexity_pattern("".join(self.ut_repr_relative()))
+        complex_pattern = self.ut_calc_weighted_sum(sorted([complex_pattern_absolute, complex_pattern_relative]),
+                                                    [4, 1])
+        weight_pattern = 2.5 * self.ut_calc_rating_weight(complex_pattern, 5, 1, factor=3)
+
+        complexity = self.ut_calc_weighted_sum(
+            [complex_note_values, complex_note_classes, complex_concurrent_notes, complex_pattern],
+            [weight_note_values, weight_note_classes, weight_concurrent_notes, weight_pattern])
 
         dict = {"Note Values": complex_note_values,
                 "Note Classes": complex_note_classes,
-                "Concurrent Notes": complex_concurrent_notes}
+                "Concurrent Notes": complex_concurrent_notes,
+                "Pattern": complex_pattern}
 
         return complexity, dict
 
-    def __complexity_wait_time(self):
+    def __complexity_note_values(self):
         """
         Complexity analysis based on the average wait time. A shorter wait time implies lower note values, thus constituting
         a more difficult song.
         """
         time = 0
         occurrences = 0
+        wait_buffer = 0
 
         for element in self.elements:
             if element.message_type == MessageType.wait:
-                time += element.value
-                occurrences += 1
-        average_wait_time = time / occurrences if occurrences else time
+                wait_buffer += element.value
+            elif element.message_type == MessageType.play or element.message_type == MessageType.stop:
+                if wait_buffer > 0:
+                    time += wait_buffer
+                    occurrences += 1
+                    wait_buffer = 0
+        average_wait_time = time / occurrences if occurrences > 0 else time
 
         x = average_wait_time
-        value = 6 - 0.1 * x + 8.5E-4 * x ** 2 - 2.425E-6 * x ** 3
+        value = 6.35 - 0.5 * x + 0.02 * x ** 2 - 3.5E-4 * x ** 3
         return self.ut_rating_adjust(value)
 
     def __complexity_note_classes(self):
@@ -328,7 +341,7 @@ class SequenceRelative(AbstractSequence):
         value *= self.__complexity_note_amount() / 3
         return self.ut_rating_adjust(value)
 
-    def complexity_pattern(self, representation: str):
+    def __complexity_pattern(self, representation: str):
         original_representation = representation
         original_regex = r"(?P<pattern>(?:[+-.]\d+){len})[-+.\d]*(?:(?P=pattern)[-+.\d]*){pat}"
         regex = original_regex.format(len="{" + str(1) + "}", pat="{" + str(1) + "}")
@@ -362,13 +375,12 @@ class SequenceRelative(AbstractSequence):
                 (-4E-1 + 7E-1 * x - 2.5E-2 * x ** 2 + 1.5E-3 * x ** 3) * self.ut_minmax(-0.1 * result[2] + 1.4, 1,
                                                                                         1.2))
             difficulty_rating += local_difficulty * adjusted_coverage
-            print(
-                "Representation: {rep}\n\tGroup: {grp}\n\tTimes: {tms}\n\tLocal Coverage: {lcv}\n\tAdjusted Local Coverage: {alcv}\n\tGlobal Coverage: {gcv}\n\tLocal Difficulty: {ldf}".format(
-                    rep=result[0], grp=result[1],
-                    tms=result[2], lcv=local_coverage,
-                    alcv=adjusted_coverage, gcv=coverage, ldf=local_difficulty))
+            # print(
+            #     "Representation: {rep}\n\tGroup: {grp}\n\tTimes: {tms}\n\tLocal Coverage: {lcv}\n\tAdjusted Local Coverage: {alcv}\n\tGlobal Coverage: {gcv}\n\tLocal Difficulty: {ldf}".format(
+            #         rep=result[0], grp=result[1],
+            #         tms=result[2], lcv=local_coverage,
+            #         alcv=adjusted_coverage, gcv=coverage, ldf=local_difficulty))
         difficulty_rating += 5 * remaining
-        print("Difficulty Rating: {rtg}".format(rtg=difficulty_rating))
         return difficulty_rating
 
     # Utility Functions
@@ -475,7 +487,8 @@ class SequenceRelative(AbstractSequence):
         return representation.count("+") + representation.count("-") + representation.count(".")
 
     @staticmethod
-    def ut_calc_rating_weight(rating: float, base: float = 1, ceiling: float = 5, factor_base=1, factor=2):
+    def ut_calc_rating_weight(rating: float, base: float = 1, ceiling: float = 5, factor_base: float = 1,
+                              factor: float = 2):
         """
         Returns a scaling factor based on the distance of the value to the ceiling from the base. Values closer to the ceiling
         are scaled by a higher faction. This process is linear.

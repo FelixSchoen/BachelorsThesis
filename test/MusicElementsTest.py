@@ -24,7 +24,7 @@ class SequenceTest(unittest.TestCase):
         print(seq.to_absolute_sequence())
 
     def test_sequence_adjust(self):
-        print(self.sequence.adjust())
+        print(self.sequence.to_absolute_sequence().quantize().to_relative_sequence().adjust())
 
     def test_sequence_quantize(self):
         print(self.sequence.to_absolute_sequence().quantize())

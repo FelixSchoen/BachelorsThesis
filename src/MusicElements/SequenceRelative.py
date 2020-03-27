@@ -86,32 +86,49 @@ class SequenceRelative(AbstractSequence):
     # Transformative Functions
 
     def adjust(self) -> SequenceRelative:
+        """
+        Adjusts the Sequence to be a valid midi representation. Checks if all opened notes are closed at the end. Does
+        not allow for closing or opening the same note without the respectively other operation. Sorts play and wait
+        operations that occur at the same time
+        :return:
+        """
         active_notes = set()
         elements_adjusted = []
+        wait_buffer = 0
+        note_buffer = []
 
         for i, element in enumerate(self.elements):
+            # Consolidates wait messages and split into equal spaced parts of max value of internal_ticks, append notes
+            # played at the same point in time, sorted by their neuron representation
             if element.message_type == MessageType.wait:
-                if element.value > internal_ticks:
-                    for j in range(0, int(element.value // internal_ticks)):
-                        elements_adjusted.append((Element(MessageType.wait, internal_ticks, std_velocity)))
-                    if element.value % internal_ticks > 0:
-                        elements_adjusted.append(
-                            Element(MessageType.wait, int(element.value % internal_ticks), std_velocity))
-                else:
-                    elements_adjusted.append(Element(MessageType.wait, int(element.value), element.velocity))
-            elif element.message_type == MessageType.stop:
+                elements_adjusted.extend(sorted(note_buffer))
+                note_buffer = []
+                wait_buffer += element.value
+            else:
+                elements_adjusted.extend(self.ut_generate_wait_message(wait_buffer))
+                wait_buffer = 0
+
+            # Check if action is legal, if so, add or remove note from list of open notes and append to notes played at
+            # the same time. The latter list is used to guarantee an order to the final string
+            if element.message_type == MessageType.stop:
                 if element.value not in active_notes:
                     continue
                 else:
-                    elements_adjusted.append(element)
+                    note_buffer.append(element)
                     active_notes.remove(element.value)
             elif element.message_type == MessageType.play:
                 if element.value in active_notes:
                     continue
                 else:
-                    elements_adjusted.append(element)
+                    note_buffer.append(element)
                     active_notes.add(element.value)
 
+        # Append last wait
+        elements_adjusted.extend(self.ut_generate_wait_message(wait_buffer))
+        # Append last notes
+        elements_adjusted.extend(note_buffer)
+
+        # Stop still active notes
         for value in active_notes:
             elements_adjusted.append(Element(MessageType.stop, value, std_velocity))
 
@@ -507,3 +524,17 @@ class SequenceRelative(AbstractSequence):
         for i, value in enumerate(values):
             result += value * (weights[i] / weight_sum)
         return result
+
+    @staticmethod
+    def ut_generate_wait_message(wait_buffer: int) -> list:
+        generated_messages = []
+        if wait_buffer > 0:
+            if wait_buffer > internal_ticks:
+                for j in range(0, int(wait_buffer // internal_ticks)):
+                    generated_messages.append((Element(MessageType.wait, internal_ticks, std_velocity)))
+                if wait_buffer % internal_ticks > 0:
+                    generated_messages.append(
+                        Element(MessageType.wait, wait_buffer % internal_ticks, std_velocity))
+            else:
+                generated_messages.append(Element(MessageType.wait, wait_buffer, std_velocity))
+        return generated_messages

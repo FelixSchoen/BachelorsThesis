@@ -79,9 +79,9 @@ class Element:
         self.velocity = velocity
 
     def to_neuron_representation(self):
-        if self.message_type == MessageType.play:
+        if self.message_type == MessageType.stop:
             return self.value - 21
-        elif self.message_type == MessageType.stop:
+        elif self.message_type == MessageType.play:
             return self.value - 21 + 88
         elif self.message_type == MessageType.wait:
             switcher = {
@@ -111,6 +111,9 @@ class Element:
 
     def __repr__(self) -> str:
         return self.__str__()
+
+    def __lt__(self, other):
+        return self.to_neuron_representation() < other.to_neuron_representation()
 
 
 class WrappedElement:

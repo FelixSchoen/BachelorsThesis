@@ -227,6 +227,12 @@ class SequenceRelative(AbstractSequence, Persistable):
                 return False
         return True
 
+    def to_neuron_representation(self) -> list[int]:
+        representation = []
+        for element in self.elements:
+            representation.append(element.to_neuron_representation())
+        return representation
+
     # Complexity Related Functions
 
     @staticmethod
@@ -259,7 +265,7 @@ class SequenceRelative(AbstractSequence, Persistable):
         weight_note_classes = 4 * self.ut_calc_rating_weight(complex_note_classes, factor=6 / 4)
 
         complex_concurrent_notes = self.__complexity_concurrent_notes()
-        weight_concurrent_notes = 4.5
+        weight_concurrent_notes = 2.5 * self.ut_calc_rating_weight(complex_concurrent_notes, factor=5 / 2.5)
 
         complex_pattern_absolute = self.__complexity_pattern("".join(self.ut_repr_absolute()), min_pattern_length=2)
         complex_pattern_relative = self.__complexity_pattern("".join(self.ut_repr_relative()), min_pattern_length=1)

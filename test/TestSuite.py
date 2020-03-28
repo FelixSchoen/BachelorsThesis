@@ -12,7 +12,7 @@ class SequenceRelativeSuite(unittest.TestCase):
         SequenceRelativeSuite.midi_file = MidiFile("res/beethoven_op27_mo3.mid")
         SequenceRelativeSuite.sequence = SequenceRelative.from_midi_track(self.midi_file.tracks[1])
 
-    def test_sequence_creation(self):
+    def test_sequence_from_midi_track(self):
         SequenceRelative.from_midi_track(self.midi_file.tracks[1])
 
     def test_sequence_conversion_to_track(self):
@@ -41,6 +41,51 @@ class SequenceRelativeSuite(unittest.TestCase):
 
     def test_sequence_complexity(self):
         self.sequence.split_to_bars()[0].complexity()
+
+
+class SequenceAbsoluteSuite(unittest.TestCase):
+    midi_file = MidiFile()
+    composition = Composition(None, None)
+
+    def test_quantize(self):
+        print(SequenceAbsolute.quantize_value(1))
+
+
+class CompositionSuite(unittest.TestCase):
+    midi_file = MidiFile()
+    composition = Composition(None, None)
+
+    def setUp(self):
+        CompositionSuite.midi_file = MidiFile("res/beethoven_op27_mo3.mid")
+        CompositionSuite.composition = Composition.from_midi_file(self.midi_file)[0]
+
+    def test_composition_from_midi_file(self):
+        Composition.from_midi_file(self.midi_file)
+
+    def test_composition_transpose(self):
+        self.composition.transpose(3)
+
+    def test_composition_stitch(self):
+        Composition.stitch([self.composition, self.composition])
+
+    def test_composition_split_to_bars(self):
+        self.composition.split_to_bars()
+
+    def test_composition_stitch_to_equal_difficulty_classes(self):
+        Composition.stitch_to_equal_difficulty_classes(self.composition.split_to_bars(), Composition.RIGHT_HAND)
+
+    def test_composition_get_split_timing(self):
+        Composition.get_split_timing(self.midi_file.tracks[0])
+
+    def test_composition_get_track(self):
+        self.composition.get_track(Composition.RIGHT_HAND)
+
+    def test_composition_get_average_complexity_class(self):
+        Composition.get_average_complexity_class(
+            [self.composition.split_to_bars()[0], self.composition.split_to_bars()[1]], Composition.RIGHT_HAND)
+
+    def test_composition_to_neuron_representation(self):
+        self.composition.to_neuron_representation(Composition.RIGHT_HAND)
 
 
 if __name__ == '__main__':

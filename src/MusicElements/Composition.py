@@ -218,6 +218,10 @@ class Composition(Persistable):
         complexity = ComplexityRating.get_complexity_rating(sum / amount)
         return complexity
 
+    def to_neuron_representation(self, track_identifier: int) -> list[int]:
+        track = self.get_track(track_identifier)
+        return track.to_neuron_representation()
+
     def __str__(self) -> str:
         return "(Numerator: " + str(self.numerator) + ", Denominator: " + str(
             self.denominator) + "\nRight Hand: " + str(self.right_hand) + "\nLeft Hand: " + str(self.left_hand) + ")"

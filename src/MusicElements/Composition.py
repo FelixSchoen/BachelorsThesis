@@ -3,7 +3,7 @@ from src.MusicElements import *
 from mido import MidiFile, MetaMessage, MidiTrack
 
 
-class Composition:
+class Composition(Persistable):
     RIGHT_HAND = 0
     LEFT_HAND = 1
 

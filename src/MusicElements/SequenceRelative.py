@@ -1,12 +1,11 @@
 from __future__ import annotations
 from mido import MidiTrack, Message
 from src.MusicElements import *
-import pickle
 import re
 import math
 
 
-class SequenceRelative(AbstractSequence):
+class SequenceRelative(AbstractSequence, Persistable):
 
     def __init__(self, numerator=4, denominator=4):
         super().__init__(numerator, denominator)
@@ -58,16 +57,6 @@ class SequenceRelative(AbstractSequence):
                 wait_buffer = 0
 
         return track
-
-    @staticmethod
-    def from_file(filename: str) -> SequenceRelative:
-        with open(filename, "rb") as input:
-            sequence = pickle.load(input)
-        return sequence
-
-    def to_file(self, filename: str):
-        with open(filename, "wb") as output:
-            pickle.dump(self, output, pickle.HIGHEST_PROTOCOL)
 
     def to_absolute_sequence(self) -> SequenceAbsolute:
         elements = {}

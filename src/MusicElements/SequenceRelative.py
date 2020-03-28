@@ -148,16 +148,9 @@ class SequenceRelative(AbstractSequence):
             self.elements.insert(i, element)
         return self
 
-    @staticmethod
-    def stitch(sequences: list[SequenceRelative]) -> SequenceRelative:
-        sequence = SequenceRelative()
-        sequence.numerator = sequences[0].numerator
-        sequence.denominator = sequences[0].denominator
-
-        for seq in sequences:
-            sequence.elements.extend(seq.elements)
-
-        return sequence
+    def stitch(self, sequence) -> SequenceRelative:
+        self.elements.extend(sequence.elements)
+        return self
 
     def split(self, capacity: int) -> tuple[SequenceRelative, SequenceRelative]:
         # Queue for elements to cover
@@ -259,20 +252,23 @@ class SequenceRelative(AbstractSequence):
         return self.complexity_breakdown()[0]
 
     def complexity_breakdown(self):
+        if self.is_empty():
+            return 1
+
         complex_note_values = self.__complexity_note_values()
-        weight_note_values = 5 * self.ut_calc_rating_weight(complex_note_values, factor=1.4)
+        weight_note_values = 5 * self.ut_calc_rating_weight(complex_note_values, factor=7 / 5)
 
         complex_note_classes = self.__complexity_note_classes()
-        weight_note_classes = 5
+        weight_note_classes = 4 * self.ut_calc_rating_weight(complex_note_classes, factor=6 / 4)
 
         complex_concurrent_notes = self.__complexity_concurrent_notes()
-        weight_concurrent_notes = 3
+        weight_concurrent_notes = 4.5
 
         complex_pattern_absolute = self.__complexity_pattern("".join(self.ut_repr_absolute()), min_pattern_length=2)
         complex_pattern_relative = self.__complexity_pattern("".join(self.ut_repr_relative()), min_pattern_length=1)
         complex_pattern = self.ut_calc_weighted_sum(sorted([complex_pattern_absolute, complex_pattern_relative]),
                                                     [4, 1])
-        weight_pattern = 2.5 * self.ut_calc_rating_weight(complex_pattern, 5, 1, factor=3)
+        weight_pattern = 2.5 * self.ut_calc_rating_weight(complex_pattern, 5, 1, factor=7.5 / 2.5)
 
         complexity = self.ut_calc_weighted_sum(
             [complex_note_values, complex_note_classes, complex_concurrent_notes, complex_pattern],

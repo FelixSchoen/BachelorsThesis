@@ -79,21 +79,27 @@ class SequenceTest(unittest.TestCase):
         print(seq)
         os.remove(filename)
 
-    def test_split_then_stitch(self):
-        split = self.sequence.to_absolute_sequence().quantize().to_relative_sequence().split_bars()
-        seq = SequenceRelative.stitch(split)
-        print(seq)
-        self.save_seq_to_file("..\out/stitched.mid", seq)
-
     def test_relative_representation(self):
         print(self.sequence.ut_repr_relative())
 
     def test_calc_weighted_rating(self):
         print(SequenceRelative.ut_calc_rating_weight(1, base=5, ceiling=1))
 
-    def test_temp(self):
-        seq = self.sequenceEasy.split_bars()
-        print(seq[0].complexity_breakdown())
+    def test_composition_to_equal_difficulty_classes(self):
+        composition = Composition.from_midi_file(self.midi_fileEasy)
+        print(composition)
+        compositions = composition[0].split_to_bars()
+        equal_complexity = Composition.stitch_to_equal_difficulty_classes(compositions, Composition.RIGHT_HAND)
+        i = 0
+        for comp in equal_complexity:
+            i += 1
+            comp.to_midi_file().save("..\out/compl/"+str(i)+"-complxty"+str(comp.final_complexity)+".mid")
+
+    def test_test(self):
+        compositions = Composition.from_midi_file(self.midi_file)
+        print(compositions)
+        compositions = Composition.from_midi_file(self.midi_fileEasy)
+        print(compositions)
 
     @staticmethod
     def save_seq_to_file(filename: str, seq: SequenceRelative):

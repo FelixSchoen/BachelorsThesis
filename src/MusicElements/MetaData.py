@@ -155,5 +155,8 @@ class WrappedElement:
     def __eq__(self, other):
         return self.element.value == other.element.value
 
+    def __lt__(self, other):
+        return self.element.value < other.element.value
+
     def __hash__(self):
         return hash(self.element.value)

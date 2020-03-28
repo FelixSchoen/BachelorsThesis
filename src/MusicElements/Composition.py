@@ -56,10 +56,6 @@ class Composition:
 
         timing = timings.pop(0)
         last_timing = timing
-        # rel_seq_right.numerator = timing[0]
-        # rel_seq_left.numerator = timing[0]
-        # rel_seq_right.denominator = timing[1]
-        # rel_seq_left.denominator = timing[1]
 
         tail_right = rel_seq_right
         seq_right = tail_right
@@ -99,10 +95,10 @@ class Composition:
                     seq_left = left_tuple[1]
 
         if seq_right is not None and seq_left is not None:
-            seq_right.numerator = timing[1]
-            seq_right.denominator = timing[2]
-            seq_left.numerator = timing[1]
-            seq_left.denominator = timing[2]
+            seq_right.numerator = last_timing[1]
+            seq_right.denominator = last_timing[2]
+            seq_left.numerator = last_timing[1]
+            seq_left.denominator = last_timing[2]
 
             composition = Composition(seq_right, seq_left, seq_right.numerator, seq_right.denominator)
             compositions.append(composition)
@@ -145,8 +141,8 @@ class Composition:
 
     def split_to_bars(self) -> list[Composition]:
         compositions = []
-        right_sequences = self.right_hand.split_bars()
-        left_sequences = self.left_hand.split_bars()
+        right_sequences = self.right_hand.split_to_bars()
+        left_sequences = self.left_hand.split_to_bars()
 
         i = 0
         while i < max(len(right_sequences), len(left_sequences)):

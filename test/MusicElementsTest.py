@@ -64,7 +64,7 @@ class SequenceTest(unittest.TestCase):
         print(composition)
 
     def test_split_bars(self):
-        sequences = self.sequence.to_absolute_sequence().quantize().to_relative_sequence().adjust().split_bars()
+        sequences = self.sequence.to_absolute_sequence().quantize().to_relative_sequence().adjust().split_to_bars()
         print(sequences)
 
     def test_to_file(self):
@@ -87,19 +87,20 @@ class SequenceTest(unittest.TestCase):
 
     def test_composition_to_equal_difficulty_classes(self):
         composition = Composition.from_midi_file(self.midi_fileEasy)
-        print(composition)
         compositions = composition[0].split_to_bars()
-        equal_complexity = Composition.stitch_to_equal_difficulty_classes(compositions, Composition.RIGHT_HAND)
+        equal_complexity = Composition.stitch_to_equal_difficulty_classes(compositions, Composition.LEFT_HAND)
         i = 0
         for comp in equal_complexity:
             i += 1
-            comp.to_midi_file().save("..\out/compl/"+str(i)+"-complxty"+str(comp.final_complexity)+".mid")
+            comp.to_midi_file().save("..\out/compl/" + str(i) + "-complxty" + str(comp.final_complexity) + ".mid")
 
     def test_test(self):
-        compositions = Composition.from_midi_file(self.midi_file)
-        print(compositions)
         compositions = Composition.from_midi_file(self.midi_fileEasy)
-        print(compositions)
+        bars = compositions[0].split_to_bars()
+        i = 0
+        for bar in bars:
+            i += 1
+            bar.to_midi_file().save("..\out/compl/" + str(i) + ".mid")
 
     @staticmethod
     def save_seq_to_file(filename: str, seq: SequenceRelative):

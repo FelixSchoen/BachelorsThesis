@@ -5,8 +5,6 @@ from mido import MidiFile, MetaMessage, MidiTrack
 
 
 class Composition(Persistable):
-    RIGHT_HAND = 0
-    LEFT_HAND = 1
 
     def __init__(self, right_hand: SequenceRelative, left_hand: SequenceRelative, numerator=4, denominator=4,
                  final_complexity=3):
@@ -25,7 +23,7 @@ class Composition(Persistable):
         for i in range(1, len(midi_file.tracks)):
             seq = SequenceRelative.from_midi_track(midi_file.tracks[i])
             if "right" not in seq.name and "left" not in seq.name:
-                break
+                continue
             sequences.append(seq)
 
         # Gather all tracks containing information
@@ -133,9 +131,10 @@ class Composition(Persistable):
 
         return self
 
-    def transpose(self, steps: int):
+    def transpose(self, steps: int) -> Composition:
         self.right_hand.transpose(steps)
         self.left_hand.transpose(steps)
+        return self
 
     @staticmethod
     def stitch(compositions: list[Composition]) -> Composition:
@@ -212,8 +211,8 @@ class Composition(Persistable):
 
     def get_track(self, track_identifier: int):
         switcher = {
-            self.RIGHT_HAND: self.right_hand,
-            self.LEFT_HAND: self.left_hand
+            RIGHT_HAND: self.right_hand,
+            LEFT_HAND: self.left_hand
         }
         return switcher.get(track_identifier)
 

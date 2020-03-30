@@ -88,5 +88,12 @@ class CompositionSuite(unittest.TestCase):
         self.composition.to_neuron_representation(Composition.RIGHT_HAND)
 
 
+class MetaDataSuite(unittest.TestCase):
+
+    def test_element_to_neural_representation(self):
+        for i in range(0, 88 * 2 + 24):
+            print(Element.from_neuron_representation(Element.from_neuron_representation(i).to_neuron_representation()))
+
+
 if __name__ == '__main__':
     unittest.main()

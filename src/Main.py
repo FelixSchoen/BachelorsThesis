@@ -8,8 +8,8 @@ def main():
         for name in filenames:
             print(name)
             midi_file = MidiFile(dirpath + "/" + name)
-            #sequence = mu.Sequence.from_midi_file(midi_file)
-            #print(Sequence.average_complexity(sequence.split(sequence.numerator, sequence.denominator)))
+            # sequence = mu.Sequence.from_midi_file(midi_file)
+            # print(Sequence.average_complexity(sequence.split(sequence.numerator, sequence.denominator)))
 
 
 def print_midi_file(midi_file: MidiFile, amount=-1) -> None:
@@ -18,11 +18,12 @@ def print_midi_file(midi_file: MidiFile, amount=-1) -> None:
     for j, track in enumerate(midi_file.tracks):
         for i, message in enumerate(track):
             if not message.is_meta: continue
-            #if message.type == "set_tempo" or message.type == "end_of_track" or message.type == "midi_port": continue
+            # if message.type == "set_tempo" or message.type == "end_of_track" or message.type == "midi_port": continue
             if i >= amount != -1:
                 break
             print("Track " + str(j) + ": " + str(message))
     print("End Midi File")
+
 
 def temp():
     midi_file = MidiFile("../res/beethoven_op27.mid")
@@ -41,5 +42,8 @@ def temp():
     midi_file.tracks[2] = track
     midi_file.save("../out/generated.mid")
 
+
 if __name__ == '__main__':
-    print_midi_file(MidiFile("../res/beethoven_op27_mo3.mid"))
+    test = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+    print(test[:-1])
+    print(test[1:])

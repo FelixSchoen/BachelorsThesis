@@ -1,4 +1,7 @@
+from __future__ import annotations
 from enum import Enum
+from src.MusicElements import Constants
+from src.Utility import Exceptions
 
 
 class Note(Enum):
@@ -112,6 +115,17 @@ class Element:
             return self.value - 21 + 88
         elif self.message_type == MessageType.wait:
             return self.value - 1 + 88 * 2
+
+    @staticmethod
+    def from_neuron_representation(value: int) -> Element:
+        if 0 <= value < 88:
+            return Element(messagetype=MessageType.stop, value=value + 21, velocity=Constants.std_velocity)
+        elif 88 <= value < 176:
+            return Element(messagetype=MessageType.play, value=value + 21 - 88, velocity=Constants.std_velocity)
+        elif 176 <= value < 200:
+            return Element(messagetype=MessageType.wait, value=value + 1 - 2 * 88, velocity=Constants.std_velocity)
+        else:
+            raise Exceptions.InvalidRepresentation
 
     def __str__(self) -> str:
         return "(" + str(self.message_type) + str(self.value) + ")"

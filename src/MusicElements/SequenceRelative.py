@@ -72,6 +72,18 @@ class SequenceRelative(AbstractSequence, Persistable):
         seq_absolute.elements = sorted(elements.items(), key=lambda item: item[1])
         return seq_absolute
 
+    @staticmethod
+    def from_neural_representation(representation: list[int], numerator: int = 4, denominator: int = 4):
+        sequence = SequenceRelative(numerator=numerator, denominator=denominator)
+        for value in representation:
+            sequence.elements.append(Element.from_neuron_representation(value))
+
+    def to_neural_representation(self) -> list[int]:
+        representation = []
+        for element in self.elements:
+            representation.append(element.to_neuron_representation())
+        return representation
+
     # Transformative Functions
 
     def adjust(self) -> SequenceRelative:

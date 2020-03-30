@@ -86,7 +86,7 @@ class Composition(Persistable):
                 denominator = timing[2]
 
                 composition = Composition(seq_right, seq_left, seq_right.numerator, seq_right.denominator)
-                compositions.append(composition)
+                compositions.append(composition.preprocess())
 
                 if i == len(timings) - 1:
                     # Last element
@@ -101,7 +101,7 @@ class Composition(Persistable):
             seq_left.denominator = last_timing[2]
 
             composition = Composition(seq_right, seq_left, seq_right.numerator, seq_right.denominator)
-            compositions.append(composition)
+            compositions.append(composition.preprocess())
 
         return compositions
 
@@ -122,6 +122,15 @@ class Composition(Persistable):
         return midi_file
 
     # Transformative Functions
+
+    def preprocess(self) -> Composition:
+        """
+        Quantizes and adjusts the sequences of this composition
+        """
+        self.right_hand = self.right_hand.to_absolute_sequence().quantize().to_relative_sequence().adjust()
+        self.left_hand = self.left_hand.to_absolute_sequence().quantize().to_relative_sequence().adjust()
+
+        return self
 
     def transpose(self, steps: int):
         self.right_hand.transpose(steps)

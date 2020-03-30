@@ -1,7 +1,6 @@
 from __future__ import annotations
 from enum import Enum
-from src.MusicElements import Constants
-from src.Utility import Exceptions
+from src.Utility import Exceptions, Constants
 
 
 class Note(Enum):

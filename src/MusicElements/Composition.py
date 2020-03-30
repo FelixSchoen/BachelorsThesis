@@ -1,5 +1,6 @@
 from __future__ import annotations
 from src.MusicElements import *
+from src.Utility import *
 from mido import MidiFile, MetaMessage, MidiTrack
 
 

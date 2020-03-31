@@ -20,8 +20,8 @@ def load_and_train_lead():
                 if composition.numerator / composition.denominator == 4 / 4:
                     bars = composition.split_to_bars()
                     stitched = Composition.stitch_to_equal_difficulty_classes(bars, track_identifier=RIGHT_HAND)
-                    for i in range(-5, 7):
-                        for difficulty_class in stitched:
+                    for difficulty_class in stitched:
+                        for i in range(-5, 7):
                             sequences.append(difficulty_class.transpose(i).right_hand)
-                        lead.add_sequence(sequences)
-                        sequences = []
+                    lead.add_sequence(sequences)
+                    sequences = []

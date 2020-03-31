@@ -33,7 +33,12 @@ class NetSicianLead:
                     entrypoint(self.model, self.CALLBACK, elements)
 
     def setup(self):
-        self.model = build_model(256, [1024])
+        # Limit memory, otherwise crashes all the time
+        physical_devices = tf.config.experimental.list_physical_devices('GPU')
+        assert len(physical_devices) > 0, "Not enough GPU hardware devices available"
+        config = tf.config.experimental.set_memory_growth(physical_devices[0], True)
+
+        self.model = build_model(256, [256, 256, 256, 256, 256])
         try:
             self.model.load_weights(tf.train.latest_checkpoint(self.CHECKPOINT_PATH))
         except AttributeError:
@@ -53,7 +58,7 @@ class NetSicianLead:
 
 BUFFER_SIZE = 256
 VOCAB_SIZE = 200
-EPOCHS = 3
+EPOCHS = 10
 
 
 def build_model(embedding_dim, rnn_units):
@@ -61,6 +66,22 @@ def build_model(embedding_dim, rnn_units):
         tf.keras.layers.Embedding(VOCAB_SIZE, embedding_dim,
                                   batch_input_shape=[1, None]),
         tf.keras.layers.LSTM(rnn_units[0],
+                             return_sequences=True,
+                             stateful=True,
+                             recurrent_initializer='glorot_uniform'),
+        tf.keras.layers.LSTM(rnn_units[1],
+                             return_sequences=True,
+                             stateful=True,
+                             recurrent_initializer='glorot_uniform'),
+        tf.keras.layers.LSTM(rnn_units[2],
+                             return_sequences=True,
+                             stateful=True,
+                             recurrent_initializer='glorot_uniform'),
+        tf.keras.layers.LSTM(rnn_units[3],
+                             return_sequences=True,
+                             stateful=True,
+                             recurrent_initializer='glorot_uniform'),
+        tf.keras.layers.LSTM(rnn_units[4],
                              return_sequences=True,
                              stateful=True,
                              recurrent_initializer='glorot_uniform'),
@@ -112,12 +133,12 @@ def generate(model, start, num, temp):
 
 
 if __name__ == "__main__":
-    model = build_model(256, [1024])
+    model = build_model(256, [256, 256, 256, 256, 256])
 
     model.load_weights(tf.train.latest_checkpoint("../../out/net/lead"))
     model.build(tf.TensorShape([1, None]))
 
-    generated = generate(model, [100], 500, 1)
+    generated = generate(model, [144], 500, 1)
     final = []
     for num in generated:
         final.append(Element.from_neuron_representation(num))

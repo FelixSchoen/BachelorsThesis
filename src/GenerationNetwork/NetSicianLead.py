@@ -22,31 +22,29 @@ class NetSicianLead:
 
     def start(self):
         self.setup()
-        elements = []
         while self.flag_active:
             try:
-                sequences = (self.queue.get(True, 3))
-                entrypoint(self.model, self.CALLBACK, sequences)
+                element = (self.queue.get(True, 3))
+                entrypoint(self.model, self.CALLBACK, element)
             except queue.Empty:
                 self.flag_active = False
-                if len(elements) > 0:
-                    entrypoint(self.model, self.CALLBACK, elements)
 
     def setup(self):
+        tf.get_logger().setLevel("ERROR")
         # Limit memory, otherwise crashes all the time
-        physical_devices = tf.config.experimental.list_physical_devices('GPU')
-        assert len(physical_devices) > 0, "Not enough GPU hardware devices available"
-        config = tf.config.experimental.set_memory_growth(physical_devices[0], True)
+        #physical_devices = tf.config.experimental.list_physical_devices('GPU')
+        #assert len(physical_devices) > 0, "Not enough GPU hardware devices available"
+        #config = tf.config.experimental.set_memory_growth(physical_devices[0], True)
 
-        self.model = build_model(256, [512, 256])
+        self.model = build_model(256, [512, 256, 256])
         try:
             self.model.load_weights(tf.train.latest_checkpoint(self.CHECKPOINT_PATH))
         except AttributeError:
             print("Could not load weights")
         self.model.compile(optimizer="adam", loss=loss)
 
-    def add_sequence(self, sequence: list[SequenceRelative]):
-        self.queue.put(sequence, block=True)
+    def add_sequence(self, element: list[SequenceRelative]):
+        self.queue.put(element, block=True)
 
     def deactivate(self):
         self.flag_active = False
@@ -58,24 +56,29 @@ class NetSicianLead:
 
 BUFFER_SIZE = 256
 VOCAB_SIZE = 200
-EPOCHS = 10
+EPOCHS = 5
 
 
 def build_model(embedding_dim, rnn_units, batch_size=1):
     model = tf.keras.Sequential([
         tf.keras.layers.Embedding(VOCAB_SIZE, embedding_dim,
-                              batch_input_shape=[batch_size, None]),
-        tf.keras.layers.Dropout(0.25),
+                                  batch_input_shape=[batch_size, None]),
+        tf.keras.layers.Dropout(0.33),
         tf.keras.layers.LSTM(rnn_units[0],
                              return_sequences=True,
                              stateful=True,
                              recurrent_initializer='glorot_uniform'),
-        tf.keras.layers.Dropout(0.25),
+        tf.keras.layers.Dropout(0.33),
         tf.keras.layers.LSTM(rnn_units[1],
                              return_sequences=True,
                              stateful=True,
                              recurrent_initializer='glorot_uniform'),
-        tf.keras.layers.Dropout(0.25),
+        tf.keras.layers.Dropout(0.33),
+        tf.keras.layers.LSTM(rnn_units[2],
+                             return_sequences=True,
+                             stateful=True,
+                             recurrent_initializer='glorot_uniform'),
+        tf.keras.layers.Dropout(0.33),
         tf.keras.layers.Dense(VOCAB_SIZE)
     ])
     return model
@@ -102,7 +105,7 @@ def entrypoint(model, callback, sequences: list[SequenceRelative]):
     dataset = dataset.map(split)
     data = dataset.shuffle(BUFFER_SIZE).batch(1, drop_remainder=True)
 
-    model.fit(data, epochs=EPOCHS, callbacks=[callback])
+    model.fit(data, epochs=EPOCHS, callbacks=[callback], verbose=1)
 
 
 def generate(model, start, num, temp):
@@ -124,12 +127,12 @@ def generate(model, start, num, temp):
 
 
 if __name__ == "__main__":
-    model = build_model(256, [512, 256])
+    model = build_model(256, [512, 256, 256])
 
     model.load_weights(tf.train.latest_checkpoint("../../out/net/lead"))
     model.build(tf.TensorShape([1, None]))
 
-    generated = generate(model, [166], 1000, 2)
+    generated = generate(model, [166], 1000, 1)
     final = []
     for num in generated:
         final.append(Element.from_neuron_representation(num))

@@ -138,9 +138,11 @@ class Composition(Persistable):
 
     @staticmethod
     def stitch(compositions: list[Composition]) -> Composition:
-        composition = Composition(SequenceRelative(), SequenceRelative())
-        composition.numerator = compositions[0].numerator
-        composition.denominator = compositions[0].denominator
+        numerator = compositions[0].numerator
+        denominator = compositions[0].denominator
+        composition = Composition(SequenceRelative(numerator, denominator), SequenceRelative(numerator, denominator))
+        composition.numerator = numerator
+        composition.denominator = denominator
 
         for composition_to_stitch in compositions:
             composition.right_hand.stitch(composition_to_stitch.right_hand)
@@ -155,12 +157,16 @@ class Composition(Persistable):
 
         i = 0
         while i < max(len(right_sequences), len(left_sequences)):
-            composition = Composition(right_hand=SequenceRelative(), left_hand=SequenceRelative(),
+            composition = Composition(right_hand=SequenceRelative(self.numerator, self.denominator), left_hand=SequenceRelative(self.numerator, self.denominator),
                                       numerator=self.numerator, denominator=self.denominator)
             if i < len(right_sequences):
                 composition.right_hand = right_sequences[i]
             if i < len(left_sequences):
                 composition.left_hand = left_sequences[i]
+            if len(composition.right_hand.elements) == 0:
+                composition.right_hand.elements = SequenceRelative.ut_generate_wait_message(self.numerator/self.denominator * 4 * internal_ticks)
+            if len(composition.left_hand.elements) == 0:
+                composition.left_hand.elements = SequenceRelative.ut_generate_wait_message(self.numerator/self.denominator * 4 * internal_ticks)
             compositions.append(composition)
             i += 1
 

@@ -9,7 +9,6 @@ import random
 
 def load_and_train_lead():
     lead = NetSicianLead()
-    lead.run()
 
     filepaths = []
 
@@ -18,17 +17,24 @@ def load_and_train_lead():
             filepath = dirpath + "/" + name
             filepaths.append(filepath)
 
-    for filepath in random.shuffle(filepaths):
+    sequences = []
+
+    for filepath in filepaths:
         midi_file = MidiFile(filepath)
 
         compositions = Composition.from_midi_file(midi_file)
-        sequences = []
+
+        lead.run()
+
         for composition in compositions:
+            print(filepath)
             if composition.numerator / composition.denominator == 4 / 4:
                 bars = composition.split_to_bars()
                 stitched = Composition.stitch_to_equal_difficulty_classes(bars, track_identifier=RIGHT_HAND)
-                for difficulty_class in stitched:
-                    for i in range(-5, 7):
+                for i in range(-5, 7):
+                    for difficulty_class in stitched:
                         sequences.append(difficulty_class.transpose(i).right_hand)
-                lead.add_sequence(random.shuffle(sequences))
-                sequences = []
+                    random.shuffle(sequences)
+                    lead.add_sequence(sequences)
+                    sequences = []
+

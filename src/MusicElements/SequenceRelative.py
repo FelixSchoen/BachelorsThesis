@@ -295,8 +295,6 @@ class SequenceRelative(AbstractSequence, Persistable):
                 "Concurrent Notes": complex_concurrent_notes,
                 "Pattern": complex_pattern}
 
-        print((complexity, dict))
-
         return complexity, dict
 
     def __complexity_note_values(self):

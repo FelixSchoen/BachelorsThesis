@@ -104,7 +104,7 @@ def pentrypoint():
     seq.adjust()
     file = MidiFile()
     file.tracks.append(seq.to_midi_track())
-    file.save("out.mid")
+    file.save("save.mid")
 
 if __name__ == '__main__':
     print("Num GPUs Available: ", len(tf.config.experimental.list_physical_devices('GPU')))

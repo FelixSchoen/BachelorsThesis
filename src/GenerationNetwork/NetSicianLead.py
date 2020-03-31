@@ -38,7 +38,7 @@ class NetSicianLead:
         assert len(physical_devices) > 0, "Not enough GPU hardware devices available"
         config = tf.config.experimental.set_memory_growth(physical_devices[0], True)
 
-        self.model = build_model(256, [256, 256, 256, 256, 256])
+        self.model = build_model(256, [512, 256])
         try:
             self.model.load_weights(tf.train.latest_checkpoint(self.CHECKPOINT_PATH))
         except AttributeError:
@@ -61,30 +61,21 @@ VOCAB_SIZE = 200
 EPOCHS = 10
 
 
-def build_model(embedding_dim, rnn_units):
+def build_model(embedding_dim, rnn_units, batch_size=1):
     model = tf.keras.Sequential([
         tf.keras.layers.Embedding(VOCAB_SIZE, embedding_dim,
-                                  batch_input_shape=[1, None]),
+                              batch_input_shape=[batch_size, None]),
+        tf.keras.layers.Dropout(0.25),
         tf.keras.layers.LSTM(rnn_units[0],
                              return_sequences=True,
                              stateful=True,
                              recurrent_initializer='glorot_uniform'),
+        tf.keras.layers.Dropout(0.25),
         tf.keras.layers.LSTM(rnn_units[1],
                              return_sequences=True,
                              stateful=True,
                              recurrent_initializer='glorot_uniform'),
-        tf.keras.layers.LSTM(rnn_units[2],
-                             return_sequences=True,
-                             stateful=True,
-                             recurrent_initializer='glorot_uniform'),
-        tf.keras.layers.LSTM(rnn_units[3],
-                             return_sequences=True,
-                             stateful=True,
-                             recurrent_initializer='glorot_uniform'),
-        tf.keras.layers.LSTM(rnn_units[4],
-                             return_sequences=True,
-                             stateful=True,
-                             recurrent_initializer='glorot_uniform'),
+        tf.keras.layers.Dropout(0.25),
         tf.keras.layers.Dense(VOCAB_SIZE)
     ])
     return model
@@ -133,17 +124,16 @@ def generate(model, start, num, temp):
 
 
 if __name__ == "__main__":
-    model = build_model(256, [256, 256, 256, 256, 256])
+    model = build_model(256, [512, 256])
 
     model.load_weights(tf.train.latest_checkpoint("../../out/net/lead"))
     model.build(tf.TensorShape([1, None]))
 
-    generated = generate(model, [144], 500, 1)
+    generated = generate(model, [166], 1000, 2)
     final = []
     for num in generated:
         final.append(Element.from_neuron_representation(num))
 
-    print(final)
     seq = SequenceRelative()
     seq.elements = final
     seq.adjust()

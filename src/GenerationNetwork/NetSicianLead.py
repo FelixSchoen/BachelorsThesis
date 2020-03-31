@@ -32,11 +32,11 @@ class NetSicianLead:
     def setup(self):
         tf.get_logger().setLevel("ERROR")
         # Limit memory, otherwise crashes all the time
-        #physical_devices = tf.config.experimental.list_physical_devices('GPU')
-        #assert len(physical_devices) > 0, "Not enough GPU hardware devices available"
-        #config = tf.config.experimental.set_memory_growth(physical_devices[0], True)
+        physical_devices = tf.config.experimental.list_physical_devices('GPU')
+        assert len(physical_devices) > 0, "Not enough GPU hardware devices available"
+        tf.config.experimental.set_memory_growth(physical_devices[0], True)
 
-        self.model = build_model(256, [512, 256, 256])
+        self.model = build_model(RNN_STUFF)
         try:
             self.model.load_weights(tf.train.latest_checkpoint(self.CHECKPOINT_PATH))
         except AttributeError:
@@ -56,29 +56,25 @@ class NetSicianLead:
 
 BUFFER_SIZE = 256
 VOCAB_SIZE = 200
-EPOCHS = 5
+EPOCHS = 10
+RNN_STUFF = [512, 256, 64]
 
 
-def build_model(embedding_dim, rnn_units, batch_size=1):
+def build_model(rnn_units, batch_size=1, dropout=0.25, embedding_dim=200):
     model = tf.keras.Sequential([
         tf.keras.layers.Embedding(VOCAB_SIZE, embedding_dim,
                                   batch_input_shape=[batch_size, None]),
-        tf.keras.layers.Dropout(0.33),
+        tf.keras.layers.Dropout(dropout),
         tf.keras.layers.LSTM(rnn_units[0],
                              return_sequences=True,
                              stateful=True,
                              recurrent_initializer='glorot_uniform'),
-        tf.keras.layers.Dropout(0.33),
+        tf.keras.layers.Dropout(dropout),
         tf.keras.layers.LSTM(rnn_units[1],
                              return_sequences=True,
                              stateful=True,
                              recurrent_initializer='glorot_uniform'),
-        tf.keras.layers.Dropout(0.33),
-        tf.keras.layers.LSTM(rnn_units[2],
-                             return_sequences=True,
-                             stateful=True,
-                             recurrent_initializer='glorot_uniform'),
-        tf.keras.layers.Dropout(0.33),
+        tf.keras.layers.Dropout(dropout),
         tf.keras.layers.Dense(VOCAB_SIZE)
     ])
     return model
@@ -127,7 +123,7 @@ def generate(model, start, num, temp):
 
 
 if __name__ == "__main__":
-    model = build_model(256, [512, 256, 256])
+    model = build_model(RNN_STUFF)
 
     model.load_weights(tf.train.latest_checkpoint("../../out/net/lead"))
     model.build(tf.TensorShape([1, None]))

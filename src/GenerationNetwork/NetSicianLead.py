@@ -13,7 +13,7 @@ class NetSicianLead:
     CHECKPOINT_PATH = "out/net/lead"
     CHECKPOINT_NAMES = "cp_{epoch}"
     CHECKPOINT = os.path.join(CHECKPOINT_PATH, CHECKPOINT_NAMES)
-    CALLBACK = tf.keras.callbacks.ModelCheckpoint(filepath=CHECKPOINT, save_weights_only=True)
+    CALLBACK = tf.keras.callbacks.ModelCheckpoint(filepath=CHECKPOINT, save_weights_only=True, save_freq=10)
 
     def __init__(self) -> None:
         self.flag_active = True
@@ -41,7 +41,7 @@ class NetSicianLead:
             self.model.load_weights(tf.train.latest_checkpoint(self.CHECKPOINT_PATH))
         except AttributeError:
             print("Could not load weights")
-        self.model.compile(optimizer="adam", loss=loss)
+        self.model.compile(optimizer="rmsprop", loss=loss)
 
     def add_sequence(self, element: list[SequenceRelative]):
         self.queue.put(element, block=True)
@@ -57,10 +57,10 @@ class NetSicianLead:
 BUFFER_SIZE = 256
 VOCAB_SIZE = 200
 EPOCHS = 10
-RNN_STUFF = [512, 256, 64]
+RNN_STUFF = [512, 256, 256]
 
 
-def build_model(rnn_units, batch_size=1, dropout=0.25, embedding_dim=200):
+def build_model(rnn_units, batch_size=1, dropout=0.25, embedding_dim=32):
     model = tf.keras.Sequential([
         tf.keras.layers.Embedding(VOCAB_SIZE, embedding_dim,
                                   batch_input_shape=[batch_size, None]),
@@ -74,6 +74,7 @@ def build_model(rnn_units, batch_size=1, dropout=0.25, embedding_dim=200):
                              return_sequences=True,
                              stateful=True,
                              recurrent_initializer='glorot_uniform'),
+        tf.keras.layers.Dense(rnn_units[2]),
         tf.keras.layers.Dropout(dropout),
         tf.keras.layers.Dense(VOCAB_SIZE)
     ])
@@ -128,7 +129,7 @@ if __name__ == "__main__":
     model.load_weights(tf.train.latest_checkpoint("../../out/net/lead"))
     model.build(tf.TensorShape([1, None]))
 
-    generated = generate(model, [166], 1000, 1)
+    generated = generate(model, [122, 199, 199], 1000, 1)
     final = []
     for num in generated:
         final.append(Element.from_neuron_representation(num))

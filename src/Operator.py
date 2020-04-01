@@ -33,11 +33,9 @@ def load_and_train_lead():
                 bars = composition.split_to_bars()
                 stitched = Composition.stitch_to_equal_difficulty_classes(bars, track_identifier=RIGHT_HAND)
                 transpose = list(range(-5, 7))
-                random.shuffle(transpose)
-                for difficulty_class in stitched:
-                    for i in transpose:
-                        sequences.append(difficulty_class.transpose(i).right_hand)
-                    random.shuffle(sequences)
+                #for difficulty_class in stitched:
+                for i in transpose:
+                    sequences.append(composition.transpose(i).right_hand)
                 lead.add_sequence(sequences)
                 sequences = []
 

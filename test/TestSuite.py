@@ -94,6 +94,13 @@ class MetaDataSuite(unittest.TestCase):
         for i in range(0, 88 * 2 + 24):
             print(Element.from_neuron_representation(Element.from_neuron_representation(i).to_neuron_representation()))
 
+    def test_test(self):
+        seq = SequenceRelative()
+        seq.elements.append(Element(MessageType.wait, 12, 64))
+        seq.elements.append(Element(MessageType.wait, 2, 64))
+        seq.adjust()
+        print(seq)
+
 
 if __name__ == '__main__':
     unittest.main()

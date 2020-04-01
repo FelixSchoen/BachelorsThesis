@@ -90,7 +90,7 @@ class SequenceRelative(AbstractSequence, Persistable):
     def adjust(self) -> SequenceRelative:
         """
         Adjusts the Sequence to be a valid midi representation. Checks if all opened notes are closed at the end. Does
-        not allow for closing or opening the same note without the respectively other operation. Sorts play and wait
+        not allow for closing or opening the same note without the respectively other operation. Sorts play and stop
         operations that occur at the same time
         :return:
         """

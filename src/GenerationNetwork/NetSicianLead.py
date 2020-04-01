@@ -9,17 +9,21 @@ from src.Utility import *
 from threading import Thread
 from mido import MidiFile
 
-EPOCHS = 5
-BATCH_SIZE = 16
+EPOCHS = 7
+BATCH_SIZE = 8
 BUFFER_SIZE = 2048
 
-CHECKPOINT_PATH = "out/net/lead"
+SAVE_PATH = "../../out/net/lead"
 CHECKPOINT_NAME = "cp_{epoch}"
+MODEL_NAME = "mode.h5"
 
 VOCAB_SIZE = 200
 NEURON_LIST = (1024, 512, 512)
 DROPOUT = 0.25
-EMBEDDING_DIM = 32
+EMBEDDING_DIM = 3
+
+
+# BEGIN TENSORFLOW CONFIGURATION
 
 
 def build_model(neuron_list=NEURON_LIST, batch_size=BATCH_SIZE, dropout=DROPOUT, embedding_dim=EMBEDDING_DIM):
@@ -55,6 +59,9 @@ def loss(labels, logits):
     return tf.keras.losses.sparse_categorical_crossentropy(labels, logits, from_logits=True)
 
 
+# BEGIN CLASS FUNCTIONS
+
+
 def setup_tensorflow():
     # Limit memory consumption
     physical_devices = tf.config.experimental.list_physical_devices('GPU')
@@ -74,14 +81,15 @@ def load_data():
             filepaths.append(filepath)
 
     sequences = []
-    filepaths = util_remove_elements(filepaths, 0.95)
+    filepaths = util_remove_elements(filepaths, -1)
 
     for filepath in filepaths:
+        print("Loading composition: " + filepath + " ... ", end="")
         midi_file = MidiFile(filepath)
         try:
             compositions = Composition.from_midi_file(midi_file)
         except Exception:
-            print("Error loading composition: " + filepath)
+            print("Skipped composition: " + filepath)
             continue
 
         for composition in compositions:
@@ -94,7 +102,7 @@ def load_data():
             for equal_complexity_class in equal_complexity_classes:
                 for i in range(-5, 7):
                     sequences.append(equal_complexity_class.right_hand.transpose(i).to_neuron_representation())
-        print("Loaded composition: " + filepath)
+        print("Done!")
 
     padded_sequences = tf.keras.preprocessing.sequence.pad_sequences(sequences, padding="post")
     dataset = tf.data.Dataset.from_tensor_slices(padded_sequences)
@@ -109,7 +117,7 @@ def load_model():
 
     # Try to load existing weights
     try:
-        model.load_weights(tf.train.latest_checkpoint(CHECKPOINT_PATH))
+        model.load_weights(tf.train.latest_checkpoint(SAVE_PATH))
     except AttributeError:
         print("Weights could not be loaded")
 
@@ -117,6 +125,42 @@ def load_model():
     model.compile(optimizer="rmsprop", loss=loss)
 
     return model
+
+
+def generate_data(start_sequence, number_of_elements, temperature=1.0):
+    # Load model with batch size of 1
+    model = build_model(batch_size=1)
+
+    model.load_weights(os.path.join(SAVE_PATH, MODEL_NAME))
+
+    model.build(tf.TensorShape([1, None]))
+
+    generated = []
+
+    input_values = start_sequence
+    input_values = tf.expand_dims(input_values, 0)
+
+    print(input_values)
+
+    model.reset_states()
+    for i in range(number_of_elements):
+        predictions = model(input_values)
+        # List of batches with size 1 to list of generated elements
+        predictions = tf.squeeze(predictions, 0)
+
+        predictions = predictions / temperature
+        predicted = tf.random.categorical(predictions, num_samples=1)[-1, 0].numpy()
+
+        if predicted == 0:
+            continue
+
+        input_values = tf.expand_dims([predicted], 0)
+        generated.append(predicted)
+
+    return generated
+
+
+# BEGIN UTIL FUNCTIONS
 
 
 def util_remove_elements(elements: list, percentage_to_drop: float) -> list:
@@ -128,12 +172,31 @@ def util_remove_elements(elements: list, percentage_to_drop: float) -> list:
 
 
 if __name__ == "__main__":
-    setup_tensorflow()
-    data = load_data()
-    model = load_model()
+    # setup_tensorflow()
+    # data = load_data()
+    # model = load_model()
+    #
+    # model.summary()
+    # print()
+    # print(data)
+    #
+    # callback = tf.keras.callbacks.ModelCheckpoint(filepath=os.path.join(SAVE_PATH, CHECKPOINT_NAME),
+    #                                               save_weights_only=True)
+    # model.fit(data, epochs=EPOCHS, callbacks=[callback], verbose=1)
+    #
+    # model.save_weights(os.path.join(SAVE_PATH, MODEL_NAME))
 
-    model.summary()
-    print()
-    print(data)
+    generated = generate_data([100], 250, temperature=0.5)
 
-    model.fit(data, epochs=EPOCHS, verbose=1)
+    final = []
+    for num in generated:
+        final.append(Element.from_neuron_representation(num))
+
+    seq = SequenceRelative()
+    seq.elements = final
+    print(final)
+    seq.adjust().adjust()
+    print(seq)
+    file = MidiFile()
+    file.tracks.append(seq.to_midi_track())
+    file.save("out.mid")

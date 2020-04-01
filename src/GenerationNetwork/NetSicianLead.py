@@ -2,142 +2,138 @@ from __future__ import annotations
 import queue
 import os
 import tensorflow as tf
-from src.MusicElements import SequenceRelative, Element
+import random
+from src.MusicElements import *
+from src.GenerationNetwork import *
+from src.Utility import *
 from threading import Thread
 from mido import MidiFile
 
+EPOCHS = 5
+BATCH_SIZE = 16
+BUFFER_SIZE = 2048
 
-class NetSicianLead:
-    BATCH_SIZE = 12  # For all transponations
-    MAX_QUEUE_SIZE = 5
-    CHECKPOINT_PATH = "out/net/lead"
-    CHECKPOINT_NAMES = "cp_{epoch}"
-    CHECKPOINT = os.path.join(CHECKPOINT_PATH, CHECKPOINT_NAMES)
-    CALLBACK = tf.keras.callbacks.ModelCheckpoint(filepath=CHECKPOINT, save_weights_only=True, save_freq=10)
+CHECKPOINT_PATH = "out/net/lead"
+CHECKPOINT_NAME = "cp_{epoch}"
 
-    def __init__(self) -> None:
-        self.flag_active = True
-        self.queue = queue.Queue(self.MAX_QUEUE_SIZE)
-        self.model = None
-
-    def start(self):
-        self.setup()
-        while self.flag_active:
-            try:
-                element = (self.queue.get(True, 3))
-                entrypoint(self.model, self.CALLBACK, element)
-            except queue.Empty:
-                self.flag_active = False
-
-    def setup(self):
-        tf.get_logger().setLevel("ERROR")
-        # Limit memory, otherwise crashes all the time
-        physical_devices = tf.config.experimental.list_physical_devices('GPU')
-        assert len(physical_devices) > 0, "Not enough GPU hardware devices available"
-        tf.config.experimental.set_memory_growth(physical_devices[0], True)
-
-        self.model = build_model(RNN_STUFF)
-        try:
-            self.model.load_weights(tf.train.latest_checkpoint(self.CHECKPOINT_PATH))
-        except AttributeError:
-            print("Could not load weights")
-        self.model.compile(optimizer="rmsprop", loss=loss)
-
-    def add_sequence(self, element: list[SequenceRelative]):
-        self.queue.put(element, block=True)
-
-    def deactivate(self):
-        self.flag_active = False
-
-    def run(self):
-        t1 = Thread(target=self.start)
-        t1.start()
-
-
-BUFFER_SIZE = 256
 VOCAB_SIZE = 200
-EPOCHS = 10
-RNN_STUFF = [512, 256, 256]
+NEURON_LIST = (1024, 512, 512)
+DROPOUT = 0.25
+EMBEDDING_DIM = 32
 
 
-def build_model(rnn_units, batch_size=1, dropout=0.25, embedding_dim=32):
+def build_model(neuron_list=NEURON_LIST, batch_size=BATCH_SIZE, dropout=DROPOUT, embedding_dim=EMBEDDING_DIM):
     model = tf.keras.Sequential([
-        tf.keras.layers.Embedding(VOCAB_SIZE, embedding_dim,
-                                  batch_input_shape=[batch_size, None]),
+        tf.keras.layers.Embedding(VOCAB_SIZE + 1,
+                                  embedding_dim,
+                                  batch_input_shape=[batch_size, None],
+                                  mask_zero=True),
         tf.keras.layers.Dropout(dropout),
-        tf.keras.layers.LSTM(rnn_units[0],
+        tf.keras.layers.LSTM(neuron_list[0],
                              return_sequences=True,
                              stateful=True,
                              recurrent_initializer='glorot_uniform'),
         tf.keras.layers.Dropout(dropout),
-        tf.keras.layers.LSTM(rnn_units[1],
+        tf.keras.layers.LSTM(neuron_list[1],
                              return_sequences=True,
                              stateful=True,
                              recurrent_initializer='glorot_uniform'),
-        tf.keras.layers.Dense(rnn_units[2]),
+        tf.keras.layers.Dense(neuron_list[2]),
         tf.keras.layers.Dropout(dropout),
-        tf.keras.layers.Dense(VOCAB_SIZE)
+        tf.keras.layers.Dense(VOCAB_SIZE + 1)
     ])
     return model
 
 
 def split(chunk):
     seq_input = chunk[:-1]
-    seq_ouptut = chunk[1:]
-    return seq_input, seq_ouptut
+    seq_output = chunk[1:]
+    return seq_input, seq_output
 
 
 def loss(labels, logits):
     return tf.keras.losses.sparse_categorical_crossentropy(labels, logits, from_logits=True)
 
 
-def entrypoint(model, callback, sequences: list[SequenceRelative]):
-    tensor_list = []
+def setup_tensorflow():
+    # Limit memory consumption
+    physical_devices = tf.config.experimental.list_physical_devices('GPU')
+    assert len(physical_devices) > 0, "Not enough GPU hardware devices available"
+    tf.config.experimental.set_memory_growth(physical_devices[0], True)
 
-    for sequence in sequences:
-        tensor = tf.convert_to_tensor(sequence.to_neuron_representation())
-        tensor_list.append(tensor)
-
-    dataset = tf.data.Dataset.from_generator(lambda: tensor_list, tf.int32, output_shapes=[None])
-    dataset = dataset.map(split)
-    data = dataset.shuffle(BUFFER_SIZE).batch(1, drop_remainder=True)
-
-    model.fit(data, epochs=EPOCHS, callbacks=[callback], verbose=1)
+    # Set log level
+    tf.get_logger().setLevel("ERROR")
 
 
-def generate(model, start, num, temp):
-    generated = []
-    values = start
-    values = tf.expand_dims(values, 0)
+def load_data():
+    filepaths = []
 
-    model.reset_states()
-    for i in range(num):
-        predictions = model(values)
-        predictions = tf.squeeze(predictions, 0)
-        predictions = predictions / temp
-        predicted = tf.random.categorical(predictions, num_samples=1)[-1, 0].numpy()
-        values = tf.expand_dims([predicted], 0)
+    for (dirpath, dirnames, filenames) in os.walk("../../res/midi"):
+        for name in filenames:
+            filepath = dirpath + "/" + name
+            filepaths.append(filepath)
 
-        generated.append(predicted)
+    sequences = []
+    filepaths = util_remove_elements(filepaths, 0.95)
 
-    return generated
+    for filepath in filepaths:
+        midi_file = MidiFile(filepath)
+        try:
+            compositions = Composition.from_midi_file(midi_file)
+        except Exception:
+            print("Error loading composition: " + filepath)
+            continue
+
+        for composition in compositions:
+            # At this time only accept 4/4 compositions
+            if composition.numerator / composition.denominator != 4 / 4:
+                continue
+
+            bars = composition.split_to_bars()
+            equal_complexity_classes = Composition.stitch_to_equal_difficulty_classes(bars, track_identifier=RIGHT_HAND)
+            for equal_complexity_class in equal_complexity_classes:
+                for i in range(-5, 7):
+                    sequences.append(equal_complexity_class.right_hand.transpose(i).to_neuron_representation())
+        print("Loaded composition: " + filepath)
+
+    padded_sequences = tf.keras.preprocessing.sequence.pad_sequences(sequences, padding="post")
+    dataset = tf.data.Dataset.from_tensor_slices(padded_sequences)
+    dataset_split = dataset.map(split)
+    dataset_batches = dataset_split.shuffle(BUFFER_SIZE).batch(BATCH_SIZE, drop_remainder=True)
+    return dataset_batches
+
+
+def load_model():
+    # Build model
+    model = build_model()
+
+    # Try to load existing weights
+    try:
+        model.load_weights(tf.train.latest_checkpoint(CHECKPOINT_PATH))
+    except AttributeError:
+        print("Weights could not be loaded")
+
+    # Compile model
+    model.compile(optimizer="rmsprop", loss=loss)
+
+    return model
+
+
+def util_remove_elements(elements: list, percentage_to_drop: float) -> list:
+    returned_list = []
+    for element in elements:
+        if not random.random() < percentage_to_drop:
+            returned_list.append(element)
+    return returned_list
 
 
 if __name__ == "__main__":
-    model = build_model(RNN_STUFF)
+    setup_tensorflow()
+    data = load_data()
+    model = load_model()
 
-    model.load_weights(tf.train.latest_checkpoint("../../out/net/lead"))
-    model.build(tf.TensorShape([1, None]))
+    model.summary()
+    print()
+    print(data)
 
-    generated = generate(model, [122, 199, 199], 1000, 1)
-    final = []
-    for num in generated:
-        final.append(Element.from_neuron_representation(num))
-
-    seq = SequenceRelative()
-    seq.elements = final
-    seq.adjust()
-    print(seq)
-    file = MidiFile()
-    file.tracks.append(seq.to_midi_track())
-    file.save("out.mid")
+    model.fit(data, epochs=EPOCHS, verbose=1)

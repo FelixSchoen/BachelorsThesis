@@ -107,22 +107,31 @@ class Element:
         self.value = value
         self.velocity = velocity
 
-    def to_neuron_representation(self):
+    def to_neuron_representation(self, padding: bool = True):
+        add = 0
+        if padding:
+            add = 1
+
         if self.message_type == MessageType.stop:
-            return self.value - 21
+            return self.value - 21 + add
         elif self.message_type == MessageType.play:
-            return self.value - 21 + 88
+            return self.value - 21 + 88 + add
         elif self.message_type == MessageType.wait:
-            return self.value - 1 + 88 * 2
+            return self.value - 1 + 88 * 2 + add
 
     @staticmethod
-    def from_neuron_representation(value: int) -> Element:
-        if 0 <= value < 88:
-            return Element(messagetype=MessageType.stop, value=value + 21, velocity=Constants.std_velocity)
-        elif 88 <= value < 176:
-            return Element(messagetype=MessageType.play, value=value + 21 - 88, velocity=Constants.std_velocity)
-        elif 176 <= value < 200:
-            return Element(messagetype=MessageType.wait, value=value + 1 - 2 * 88, velocity=Constants.std_velocity)
+    def from_neuron_representation(value: int, padding: bool = True) -> Element:
+        add = 0
+        if padding:
+            add = 1
+
+        if 0 <= value - add < 88:
+            return Element(messagetype=MessageType.stop, value=value + 21 - add, velocity=Constants.std_velocity)
+        elif 88 <= value - add < 176:
+            return Element(messagetype=MessageType.play, value=value + 21 - 88 - add, velocity=Constants.std_velocity)
+        elif 176 <= value - add < 200:
+            return Element(messagetype=MessageType.wait, value=value + 1 - 2 * 88 - add,
+                           velocity=Constants.std_velocity)
         else:
             raise Exceptions.InvalidRepresentation
 

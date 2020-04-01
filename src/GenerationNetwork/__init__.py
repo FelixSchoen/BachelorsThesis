@@ -1,1 +1,1 @@
-from src.GenerationNetwork.NetSicianLead import NetSicianLead
+from src.GenerationNetwork.NetSicianLeadOld import NetSicianLead

@@ -8,7 +8,19 @@ internal_ticks = 24
 external_ticks = 480
 
 
-class Difficulty(Enum):
-    EASY = 1,
-    MEDIUM = 2,
+class Complexity(Enum):
+    EASY = 1
+    MEDIUM = 2
     HARD = 3
+
+    def __lt__(self, other):
+        return self.value < other.value
+
+    def __le__(self, other):
+        return self.value <= other.value
+
+    def __gt__(self, other):
+        return self.value > other.value
+
+    def __ge__(self, other):
+        return self.value >= other.value

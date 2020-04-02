@@ -10,12 +10,12 @@ from threading import Thread
 from mido import MidiFile
 
 EPOCHS = 7
-BATCH_SIZE = 8
+BATCH_SIZE = 1
 BUFFER_SIZE = 2048
 
 SAVE_PATH = "../../out/net/lead"
 CHECKPOINT_NAME = "cp_{epoch}"
-MODEL_NAME = "mode.h5"
+MODEL_NAME = "model_full.h5"
 
 VOCAB_SIZE = 200
 NEURON_LIST = (1024, 512, 512)
@@ -97,11 +97,11 @@ def load_data():
             if composition.numerator / composition.denominator != 4 / 4:
                 continue
 
-            bars = composition.split_to_bars()
-            equal_complexity_classes = Composition.stitch_to_equal_difficulty_classes(bars, track_identifier=RIGHT_HAND)
-            for equal_complexity_class in equal_complexity_classes:
-                for i in range(-5, 7):
-                    sequences.append(equal_complexity_class.right_hand.transpose(i).to_neuron_representation())
+            # bars = composition.split_to_bars()
+            # equal_complexity_classes = Composition.stitch_to_equal_difficulty_classes(bars, track_identifier=RIGHT_HAND)
+            # for equal_complexity_class in equal_complexity_classes:
+            for i in range(-5, 7):
+                sequences.append(composition.right_hand.transpose(i).to_neuron_representation())
         print("Done!")
 
     padded_sequences = tf.keras.preprocessing.sequence.pad_sequences(sequences, padding="post")
@@ -172,31 +172,31 @@ def util_remove_elements(elements: list, percentage_to_drop: float) -> list:
 
 
 if __name__ == "__main__":
-    # setup_tensorflow()
-    # data = load_data()
-    # model = load_model()
-    #
-    # model.summary()
-    # print()
-    # print(data)
-    #
-    # callback = tf.keras.callbacks.ModelCheckpoint(filepath=os.path.join(SAVE_PATH, CHECKPOINT_NAME),
-    #                                               save_weights_only=True)
-    # model.fit(data, epochs=EPOCHS, callbacks=[callback], verbose=1)
-    #
-    # model.save_weights(os.path.join(SAVE_PATH, MODEL_NAME))
+    setup_tensorflow()
+    data = load_data()
+    model = load_model()
 
-    generated = generate_data([100], 250, temperature=0.5)
+    model.summary()
+    print()
+    print(data)
 
-    final = []
-    for num in generated:
-        final.append(Element.from_neuron_representation(num))
+    callback = tf.keras.callbacks.ModelCheckpoint(filepath=os.path.join(SAVE_PATH, CHECKPOINT_NAME),
+                                                  save_weights_only=True)
+    model.fit(data, epochs=EPOCHS, callbacks=[callback], verbose=1)
 
-    seq = SequenceRelative()
-    seq.elements = final
-    print(final)
-    seq.adjust().adjust()
-    print(seq)
-    file = MidiFile()
-    file.tracks.append(seq.to_midi_track())
-    file.save("out.mid")
+    model.save_weights(os.path.join(SAVE_PATH, MODEL_NAME))
+
+    # generated = generate_data([100], 250, temperature=0.5)
+    #
+    # final = []
+    # for num in generated:
+    #     final.append(Element.from_neuron_representation(num))
+    #
+    # seq = SequenceRelative()
+    # seq.elements = final
+    # print(final)
+    # seq.adjust().adjust()
+    # print(seq)
+    # file = MidiFile()
+    # file.tracks.append(seq.to_midi_track())
+    # file.save("out.mid")

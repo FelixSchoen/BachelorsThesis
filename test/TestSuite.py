@@ -1,6 +1,7 @@
 import unittest
 import os
 from src.MusicElements import *
+from src.Utility import *
 from mido import MidiFile
 
 
@@ -41,6 +42,45 @@ class SequenceRelativeSuite(unittest.TestCase):
 
     def test_sequence_complexity(self):
         self.sequence.split_to_bars()[0].complexity()
+
+    def test_test(self):
+        count_easy = 0
+        count_medium = 0
+        count_hard = 0
+
+        print("Start")
+
+        midi_file = MidiFile("res/beethoven_op013_mo1.mid")
+        comps = Composition.from_midi_file(midi_file)
+
+        out_file = MidiFile()
+        seq = SequenceRelative()
+        i = 0
+        for comp in comps:
+            bars = comp.split_to_bars()
+            for bar in bars:
+                i += 1
+                if i == 18:
+                    print(bar.right_hand)
+                bar.to_midi_file().save("out/" + str(i) + ".mid")
+                seq.stitch(bar.right_hand)
+
+        out_file.tracks.append(seq.to_midi_track())
+
+        out_file.save("out/file.mid")
+
+        # for (dirpath, dirnames, filenames) in os.walk("../res/midi"):
+        #     for name in filenames:
+        #         filepath = dirpath + "/" + name
+        #         midi_file = MidiFile(filepath)
+        #         compositions = Composition.from_midi_file(midi_file)
+        #         for composition in compositions:
+        #             bars = composition.split_to_bars()
+        #             for bar in bars:
+        #                 print(bar.right_hand.complexity())
+
+        print("Easy: {easy}, Medium: {medium}, Hard: {hard}".format(easy=count_easy, medium=count_medium,
+                                                                    hard=count_hard))
 
 
 class SequenceAbsoluteSuite(unittest.TestCase):
@@ -93,13 +133,6 @@ class MetaDataSuite(unittest.TestCase):
     def test_element_to_neural_representation(self):
         for i in range(0, 88 * 2 + 24):
             print(Element.from_neuron_representation(Element.from_neuron_representation(i).to_neuron_representation()))
-
-    def test_test(self):
-        seq = SequenceRelative()
-        seq.elements.append(Element(MessageType.wait, 12, 64))
-        seq.elements.append(Element(MessageType.wait, 2, 64))
-        seq.adjust()
-        print(seq)
 
 
 if __name__ == '__main__':

@@ -101,9 +101,9 @@ class SequenceRelative(AbstractSequence, Persistable):
 
         for i, element in enumerate(self.elements):
             # Consolidates wait messages and split into equal spaced parts of max value of internal_ticks, append notes
-            # played at the same point in time, sorted by their neuron representation
+            # played at the same point in time, sorted by their note value
             if element.message_type == MessageType.wait:
-                elements_adjusted.extend(sorted(note_buffer))
+                elements_adjusted.extend(map(lambda x: x.element, sorted(note_buffer)))
                 note_buffer = []
                 wait_buffer += element.value
             else:
@@ -116,25 +116,34 @@ class SequenceRelative(AbstractSequence, Persistable):
                 if element.value not in active_notes:
                     continue
                 else:
-                    note_buffer.append(element)
+                    note_buffer.append(WrappedElement(element))
                     active_notes.remove(element.value)
             elif element.message_type == MessageType.play:
                 if element.value in active_notes:
                     continue
                 else:
-                    note_buffer.append(element)
+                    note_buffer.append(WrappedElement(element))
                     active_notes.add(element.value)
 
         # Append last wait
         elements_adjusted.extend(self.ut_generate_wait_message(wait_buffer))
         # Append last notes
-        elements_adjusted.extend(note_buffer)
+        elements_adjusted.extend(map(lambda x: x.element, note_buffer))
 
         # Stop still active notes
         for value in active_notes:
             elements_adjusted.append(Element(MessageType.stop, value, std_velocity))
 
         self.elements = elements_adjusted
+
+        # Fill bar
+        bar = self.split_to_bars()[-1]
+        remaining = 4 * internal_ticks * self.numerator / self.denominator
+        for element in bar.elements:
+            if element.message_type == MessageType.wait:
+                remaining -= element.value
+        self.elements.extend(self.ut_generate_wait_message(remaining))
+
         return self
 
     def transpose(self, steps: int) -> SequenceRelative:
@@ -265,37 +274,45 @@ class SequenceRelative(AbstractSequence, Persistable):
         return avg_complexity, dict
 
     def complexity(self):
-        return self.complexity_breakdown()[0]
-
-    def complexity_breakdown(self):
         if self.is_empty():
-            return [1]
+            return Complexity.EASY
 
-        complex_note_values = self.__complexity_note_values()
-        weight_note_values = 5 * self.ut_calc_rating_weight(complex_note_values, factor=7 / 5)
+        complexity_note_values = self.__complexity_note_values()
+        complexity_note_classes = self.__complexity_note_classes()
+        complexity_concurrent_notes = self.__complexity_concurrent_notes()
+        complexity_pattern_relative = self.__complexity_pattern("".join(self.ut_repr_relative()), min_pattern_length=1)
+        complexity_pattern_absolute = self.__complexity_pattern("".join(self.ut_repr_absolute()), min_pattern_length=2)
+        complexity_pattern = min(complexity_pattern_relative, complexity_pattern_absolute)
 
-        complex_note_classes = self.__complexity_note_classes()
-        weight_note_classes = 4 * self.ut_calc_rating_weight(complex_note_classes, factor=6 / 4)
+        dict = {"Note Values": complexity_note_values,
+                "Pattern": complexity_pattern,
+                "Note Classes": complexity_note_classes,
+                "Concurrent Notes": complexity_concurrent_notes, }
 
-        complex_concurrent_notes = self.__complexity_concurrent_notes()
-        weight_concurrent_notes = 2.5 * self.ut_calc_rating_weight(complex_concurrent_notes, factor=5 / 2.5)
+        primary_complexity = complexity_note_values
+        secondary_complexity = [complexity_pattern, complexity_concurrent_notes, complexity_note_classes]
 
-        complex_pattern_absolute = self.__complexity_pattern("".join(self.ut_repr_absolute()), min_pattern_length=2)
-        complex_pattern_relative = self.__complexity_pattern("".join(self.ut_repr_relative()), min_pattern_length=1)
-        complex_pattern = self.ut_calc_weighted_sum(sorted([complex_pattern_absolute, complex_pattern_relative]),
-                                                    [4, 1])
-        weight_pattern = 2.5 * self.ut_calc_rating_weight(complex_pattern, 5, 1, factor=7.5 / 2.5)
-
-        complexity = self.ut_calc_weighted_sum(
-            [complex_note_values, complex_note_classes, complex_concurrent_notes, complex_pattern],
-            [weight_note_values, weight_note_classes, weight_concurrent_notes, weight_pattern])
-
-        dict = {"Note Values": complex_note_values,
-                "Note Classes": complex_note_classes,
-                "Concurrent Notes": complex_concurrent_notes,
-                "Pattern": complex_pattern}
-
-        return complexity, dict
+        if primary_complexity <= Complexity.EASY:
+            # Easy or Medium
+            if all(complexity < Complexity.HARD for complexity in secondary_complexity) \
+                    and not all(complexity == Complexity.MEDIUM for complexity in secondary_complexity):
+                return Complexity.EASY
+            else:
+                return Complexity.MEDIUM
+        elif primary_complexity >= Complexity.HARD:
+            # Medium or Hard
+            if all(complexity > Complexity.EASY for complexity in secondary_complexity):
+                return Complexity.HARD
+            else:
+                return Complexity.MEDIUM
+        else:
+            if all(complexity < Complexity.HARD for complexity in secondary_complexity) \
+                    and sum(map(lambda c: c >= Complexity.MEDIUM, secondary_complexity)) <= 1:
+                return Complexity.EASY
+            elif all(complexity > Complexity.EASY for complexity in secondary_complexity) \
+                    and sum(map(lambda c: c <= Complexity.MEDIUM, secondary_complexity)) <= 2:
+                return Complexity.HARD
+            return Complexity.MEDIUM
 
     def __complexity_note_values(self):
         """
@@ -316,9 +333,12 @@ class SequenceRelative(AbstractSequence, Persistable):
                     wait_buffer = 0
         average_wait_time = time / occurrences if occurrences > 0 else internal_ticks * self.denominator
 
-        x = average_wait_time
-        value = 6.35 - 0.5 * x + 0.02 * x ** 2 - 3.5E-4 * x ** 3
-        return self.ut_rating_adjust(value)
+        if average_wait_time >= internal_ticks * 18 / 24:
+            return Complexity.EASY
+        elif average_wait_time >= internal_ticks * 12 / 24:
+            return Complexity.MEDIUM
+        else:
+            return Complexity.HARD
 
     def __complexity_note_classes(self):
         """
@@ -331,23 +351,14 @@ class SequenceRelative(AbstractSequence, Persistable):
             if element.message_type == MessageType.play:
                 classes.add(element.value)
 
-        x = len(classes)
-        value = (1 / 3 * x + 1 / 3) / (self.numerator / self.denominator)
-        return self.ut_rating_adjust(value)
+        amount_classes = len(classes)
 
-    def __complexity_note_amount(self):
-        """
-        Complexity analysis based on the total amount of notes played. Dependant on a function judging the complexity
-        compared to the time signature of the bar.
-        """
-        amount = 0
-        for element in self.elements:
-            if element.message_type == MessageType.play:
-                amount += 1
-
-        x = amount
-        value = (-0.1 + 3.25E-1 * x - 1.0E-2 * x ** 2 + 1.5E-4 * x ** 3) / (self.numerator / self.denominator)
-        return self.ut_rating_adjust(value)
+        if amount_classes <= 4:
+            return Complexity.EASY
+        elif amount_classes <= 8:
+            return Complexity.MEDIUM
+        else:
+            return Complexity.HARD
 
     def __complexity_concurrent_notes(self):
         """
@@ -365,16 +376,20 @@ class SequenceRelative(AbstractSequence, Persistable):
                     occurrences += 1
             last_element = element
 
-        x = notes / occurrences if occurrences else notes
-        value = 5 - 1.65E1 * x + 1.925E1 * x ** 2 - 8 * x ** 3 + 1.15 * x ** 4
-        value *= self.__complexity_note_amount() / 3
-        return self.ut_rating_adjust(value)
+        average_concurrent_notes = notes / occurrences if occurrences else notes
+
+        if average_concurrent_notes <= 2:
+            return Complexity.EASY
+        elif average_concurrent_notes <= 3.5:
+            return Complexity.MEDIUM
+        else:
+            return Complexity.HARD
 
     def __complexity_pattern(self, representation: str, min_pattern_length: int = 2):
         original_representation = representation
         if self.ut_repr_count(original_representation) <= min_pattern_length:
             # Check if pattern can exist
-            return 1
+            return Complexity.EASY
 
         original_regex = r"(?P<pattern>(?:[-+.]\d+[-+.]){len})(?:[-+.]\d+[-+.])*(?:(?P=pattern)(?:[-+.]\d+[-+.])*){pat}"
         regex = original_regex.format(len="{" + str(min_pattern_length) + "}", pat="{" + str(1) + "}")
@@ -392,28 +407,24 @@ class SequenceRelative(AbstractSequence, Persistable):
             iteration_representation = iteration_representation.replace(results[iteration_index][1], "")
             iteration_index += 1
 
-        difficulty_rating = 0
-        coverage = 0
-        remaining = 1
-        for result in results:
-            local_coverage = (self.ut_repr_count(result[1]) * result[
-                2]) / self.ut_repr_count(result[0])
-            adjusted_coverage = local_coverage * remaining
-            coverage += adjusted_coverage
-            remaining = 1 - coverage
-            x = self.ut_repr_count(result[1])
-            # Function 1: Judging group size
-            # Function 2: Increase if group size is small (many small groups are not that easy to remember)
-            local_difficulty = self.ut_minmax(
-                (-0.4 + 0.7 * x - 0.025 * x ** 2 + 0.0015 * x ** 3) * self.ut_minmax(-0.1 * result[2] + 1.4, 1, 1.2))
-            difficulty_rating += local_difficulty * adjusted_coverage
-            # print(
-            #     "Representation: {rep}\n\tGroup: {grp}\n\tTimes: {tms}\n\tLocal Coverage: {lcv}\n\tAdjusted Local Coverage: {alcv}\n\tGlobal Coverage: {gcv}\n\tLocal Difficulty: {ldf}".format(
-            #         rep=result[0], grp=result[1],
-            #         tms=result[2], lcv=local_coverage,
-            #         alcv=adjusted_coverage, gcv=coverage, ldf=local_difficulty))
-        difficulty_rating += 5 * remaining
-        return difficulty_rating
+        coverage = 1 - self.ut_repr_count(iteration_representation) / self.ut_repr_count(original_representation)
+
+        if coverage >= 0.85 and len(results) <= 3:
+            return Complexity.EASY
+        elif coverage >= 0.6:
+            # Easy or Medium
+            if len(results) <= 3 and all(i[2] <= 5 for i in results):
+                return Complexity.EASY
+            else:
+                return Complexity.MEDIUM
+        elif coverage >= 0.25:
+            # Medium or Hard
+            if len(results) <= 4 and all(i[2] <= 7 for i in results):
+                return Complexity.EASY
+            else:
+                return Complexity.MEDIUM
+        else:
+            return Complexity.HARD
 
     # Utility Functions
 

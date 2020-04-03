@@ -98,6 +98,7 @@ class SequenceRelative(AbstractSequence, Persistable):
         elements_adjusted = []
         wait_buffer = 0
         note_buffer = []
+        total_wait_time = 0
 
         for i, element in enumerate(self.elements):
             # Consolidates wait messages and split into equal spaced parts of max value of internal_ticks, append notes
@@ -108,6 +109,7 @@ class SequenceRelative(AbstractSequence, Persistable):
                 wait_buffer += element.value
             else:
                 elements_adjusted.extend(self.ut_generate_wait_message(wait_buffer))
+                total_wait_time += wait_buffer
                 wait_buffer = 0
 
             # Check if action is legal, if so, add or remove note from list of open notes and append to notes played at
@@ -127,6 +129,7 @@ class SequenceRelative(AbstractSequence, Persistable):
 
         # Append last wait
         elements_adjusted.extend(self.ut_generate_wait_message(wait_buffer))
+        total_wait_time += wait_buffer
         # Append last notes
         elements_adjusted.extend(map(lambda x: x.element, note_buffer))
 
@@ -137,12 +140,12 @@ class SequenceRelative(AbstractSequence, Persistable):
         self.elements = elements_adjusted
 
         # Fill bar
-        bar = self.split_to_bars()[-1]
-        remaining = 4 * internal_ticks * self.numerator / self.denominator
-        for element in bar.elements:
-            if element.message_type == MessageType.wait:
-                remaining -= element.value
-        self.elements.extend(self.ut_generate_wait_message(remaining))
+        if self.elements[-1].message_type == MessageType.wait:
+            wait_message = self.elements.pop(-1)
+            total_wait_time -= wait_message.value
+        ticks_in_bar = 4 * internal_ticks * self.numerator / self.denominator
+        remaining = (ticks_in_bar - (total_wait_time % ticks_in_bar)) % ticks_in_bar
+        self.elements.extend(self.ut_generate_wait_message(int(remaining)))
 
         return self
 
@@ -273,7 +276,7 @@ class SequenceRelative(AbstractSequence, Persistable):
                 "Concurrent Notes": sum([pair[1]["Concurrent Notes"] for pair in complexity]) / occurrences}
         return avg_complexity, dict
 
-    def complexity(self):
+    def complexity(self) -> Complexity:
         if self.is_empty():
             return Complexity.EASY
 
@@ -292,25 +295,31 @@ class SequenceRelative(AbstractSequence, Persistable):
         primary_complexity = complexity_note_values
         secondary_complexity = [complexity_pattern, complexity_concurrent_notes, complexity_note_classes]
 
-        if primary_complexity <= Complexity.EASY:
+        if primary_complexity == Complexity.EASY:
             # Easy or Medium
-            if all(complexity < Complexity.HARD for complexity in secondary_complexity) \
-                    and not all(complexity == Complexity.MEDIUM for complexity in secondary_complexity):
+            if sum(map(lambda c: c.value,
+                       secondary_complexity)) <= 2 * Complexity.MEDIUM.value or complexity_pattern == Complexity.EASY:
                 return Complexity.EASY
             else:
                 return Complexity.MEDIUM
-        elif primary_complexity >= Complexity.HARD:
+        elif primary_complexity == Complexity.HARD:
             # Medium or Hard
-            if all(complexity > Complexity.EASY for complexity in secondary_complexity):
+            if sum(map(lambda c: c.value,
+                       secondary_complexity)) > 2 * Complexity.MEDIUM.value or complexity_pattern == Complexity.HARD:
                 return Complexity.HARD
+            # if complexity_pattern == Complexity.HARD or \
+            #         (complexity_pattern > Complexity.EASY
+            #          and sum(map(lambda c: c <= Complexity.EASY, secondary_complexity)) <= 1) or \
+            #         (sum(map(lambda c: c <= Complexity.MEDIUM, secondary_complexity)) <= 2):
+            #     return Complexity.HARD
             else:
                 return Complexity.MEDIUM
         else:
-            if all(complexity < Complexity.HARD for complexity in secondary_complexity) \
-                    and sum(map(lambda c: c >= Complexity.MEDIUM, secondary_complexity)) <= 1:
+            if all(complexity < Complexity.HARD for complexity in secondary_complexity) and sum(
+                    map(lambda c: c.value, secondary_complexity)) < 3 * Complexity.MEDIUM.value:
                 return Complexity.EASY
-            elif all(complexity > Complexity.EASY for complexity in secondary_complexity) \
-                    and sum(map(lambda c: c <= Complexity.MEDIUM, secondary_complexity)) <= 2:
+            elif all(complexity > Complexity.EASY for complexity in secondary_complexity) and sum(
+                    map(lambda c: c.value, secondary_complexity)) > 3 * Complexity.MEDIUM.value:
                 return Complexity.HARD
             return Complexity.MEDIUM
 

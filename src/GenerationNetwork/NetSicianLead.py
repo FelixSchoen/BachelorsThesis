@@ -1,12 +1,9 @@
 from __future__ import annotations
-import queue
 import os
 import tensorflow as tf
 import random
 from src.MusicElements import *
-from src.GenerationNetwork import *
 from src.Utility import *
-from threading import Thread
 from mido import MidiFile
 
 EPOCHS = 7
@@ -81,7 +78,7 @@ def load_data():
             filepaths.append(filepath)
 
     sequences = []
-    filepaths = util_remove_elements(filepaths, -1)
+    filepaths = Util.util_remove_elements(filepaths, -1)
 
     for filepath in filepaths:
         print("Loading composition: " + filepath + " ... ", end="")
@@ -158,17 +155,6 @@ def generate_data(start_sequence, number_of_elements, temperature=1.0):
         generated.append(predicted)
 
     return generated
-
-
-# BEGIN UTIL FUNCTIONS
-
-
-def util_remove_elements(elements: list, percentage_to_drop: float) -> list:
-    returned_list = []
-    for element in elements:
-        if not random.random() < percentage_to_drop:
-            returned_list.append(element)
-    return returned_list
 
 
 if __name__ == "__main__":

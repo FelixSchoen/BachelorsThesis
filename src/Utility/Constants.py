@@ -24,3 +24,6 @@ class Complexity(Enum):
 
     def __ge__(self, other):
         return self.value >= other.value
+
+    def __add__(self, other):
+        return self.value + other.value

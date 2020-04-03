@@ -2,6 +2,7 @@ from __future__ import annotations
 from src.MusicElements import *
 from src.Utility import *
 from mido import MidiFile, MetaMessage, MidiTrack
+import re
 
 
 class Composition(Persistable):
@@ -18,23 +19,18 @@ class Composition(Persistable):
 
     @staticmethod
     def from_midi_file(midi_file: MidiFile) -> list[Composition]:
-        sequences = []
-
-        for i in range(1, len(midi_file.tracks)):
-            seq = SequenceRelative.from_midi_track(midi_file.tracks[i])
-            if "right" not in seq.name and "left" not in seq.name:
-                continue
-            sequences.append(seq)
-
         # Gather all tracks containing information
         right_hand_sequences = []
         left_hand_sequences = []
 
-        for seq in sequences:
-            if "right" in seq.name:
+        for i in range(1, len(midi_file.tracks)):
+            seq = SequenceRelative.from_midi_track(midi_file.tracks[i])
+            if re.compile(r"(?i)\bright\b").search(seq.name):
                 right_hand_sequences.append(seq)
-            elif "left" in seq.name:
+            elif re.compile(r"(?i)\bleft\b").search(seq.name):
                 left_hand_sequences.append(seq)
+            else:
+                continue
 
         abs_seq_right = right_hand_sequences.pop(0).to_absolute_sequence()
         abs_seq_left = left_hand_sequences.pop(0).to_absolute_sequence()
@@ -63,6 +59,7 @@ class Composition(Persistable):
 
         compositions = []
 
+        # Standard time signature, only overridden if specified in midi track
         numerator = 4
         denominator = 4
 
@@ -81,11 +78,11 @@ class Composition(Persistable):
                 seq_left.denominator = denominator
                 tail_left = left_tuple[1]
 
+                composition = Composition(seq_right, seq_left, numerator, denominator)
+                compositions.append(composition.preprocess())
+
                 numerator = timing[1]
                 denominator = timing[2]
-
-                composition = Composition(seq_right, seq_left, seq_right.numerator, seq_right.denominator)
-                compositions.append(composition.preprocess())
 
                 if i == len(timings) - 1:
                     # Last element
@@ -157,16 +154,19 @@ class Composition(Persistable):
 
         i = 0
         while i < max(len(right_sequences), len(left_sequences)):
-            composition = Composition(right_hand=SequenceRelative(self.numerator, self.denominator), left_hand=SequenceRelative(self.numerator, self.denominator),
+            composition = Composition(right_hand=SequenceRelative(self.numerator, self.denominator),
+                                      left_hand=SequenceRelative(self.numerator, self.denominator),
                                       numerator=self.numerator, denominator=self.denominator)
             if i < len(right_sequences):
                 composition.right_hand = right_sequences[i]
             if i < len(left_sequences):
                 composition.left_hand = left_sequences[i]
             if len(composition.right_hand.elements) == 0:
-                composition.right_hand.elements = SequenceRelative.ut_generate_wait_message(self.numerator/self.denominator * 4 * internal_ticks)
+                composition.right_hand.elements = SequenceRelative.ut_generate_wait_message(
+                    self.numerator / self.denominator * 4 * internal_ticks)
             if len(composition.left_hand.elements) == 0:
-                composition.left_hand.elements = SequenceRelative.ut_generate_wait_message(self.numerator/self.denominator * 4 * internal_ticks)
+                composition.left_hand.elements = SequenceRelative.ut_generate_wait_message(
+                    self.numerator / self.denominator * 4 * internal_ticks)
             compositions.append(composition)
             i += 1
 

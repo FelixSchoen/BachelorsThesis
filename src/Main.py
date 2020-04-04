@@ -1,6 +1,8 @@
 from mido import MidiFile, MetaMessage
 from os import walk
 from src.MusicElements import *
+from src.Utility import *
+from concurrent.futures import ThreadPoolExecutor
 
 
 def main():
@@ -43,7 +45,38 @@ def temp():
     midi_file.save("../out/generated.mid")
 
 
+def judge_difficulty_stitch_and_persist(name, midi_file):
+    try:
+        compositions = Composition.from_midi_file(midi_file)
+        for composition in compositions:
+            if composition.numerator / composition.denominator != 4 / 4:
+                continue
+            equal_classes = Composition.stitch_equal_complexity(composition.split_to_bars(), Constants.RIGHT_HAND)
+            for i, equal_class in enumerate(equal_classes):
+                if equal_class.final_complexity == Complexity.EASY:
+                    equal_class.to_file("../out/lib/4-4/easy/"+name+"-"+str(i)+".pkl")
+                elif equal_class.final_complexity == Complexity.MEDIUM:
+                    equal_class.to_file("../out/lib/4-4/medium/"+name+"-"+str(i)+".pkl")
+                else:
+                    equal_class.to_file("../out/lib/4-4/hard/"+name+"-"+str(i)+".pkl")
+
+    except Exception as e:
+        print(name, e)
+
+
+def load_midi_files_and_persist():
+    executor = ThreadPoolExecutor()
+
+    directories = []
+    for (dirpath, dirnames, filenames) in walk("../res/midi"):
+        for name in filenames:
+            directories.append((dirpath + "/" + name, name))
+    # directories = Util.util_remove_elements(directories, 1)
+
+    for pairing in directories:
+        midi_file = MidiFile(pairing[0])
+        executor.submit(judge_difficulty_stitch_and_persist, pairing[1][:-4], midi_file)
+
+
 if __name__ == '__main__':
-    test = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
-    print(test[:-1])
-    print(test[1:])
+    load_midi_files_and_persist()

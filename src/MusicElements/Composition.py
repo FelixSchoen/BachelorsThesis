@@ -8,7 +8,7 @@ import re
 class Composition(Persistable):
 
     def __init__(self, right_hand: SequenceRelative, left_hand: SequenceRelative, numerator=4, denominator=4,
-                 final_complexity=3):
+                 final_complexity=-1):
         self.right_hand = right_hand
         self.left_hand = left_hand
         self.numerator = numerator
@@ -173,30 +173,25 @@ class Composition(Persistable):
         return compositions
 
     @staticmethod
-    def stitch_to_equal_difficulty_classes(compositions: list[Composition], track_identifier: int) -> list[Composition]:
-        classes = []
-        pivot = None
-        pivot_complexity = 0
+    def stitch_equal_complexity(compositions: list[Composition], track_identifier: int, max_size: int = 8) -> \
+            list[Composition]:
+        complexity_classes = [[]]
+        pivot_complexity = compositions[0].get_track(track_identifier).complexity()
 
         for composition in compositions:
-            if len(classes) == 0:
-                classes.append([composition])
-                pivot_complexity = composition.get_track(track_identifier).complexity()
+            complexity = composition.get_track(track_identifier).complexity()
+            if complexity == pivot_complexity and len(complexity_classes[-1]) < max_size:
+                complexity_classes[-1].append(composition)
             else:
-                decider_complexity = composition.get_track(track_identifier).complexity()
-                if ComplexityRating.in_same_category(pivot_complexity, decider_complexity):
-                    classes[-1].append(composition)
-                else:
-                    pivot_complexity = composition.get_track(track_identifier).complexity()
-                    classes.append([composition])
+                pivot_complexity = complexity
+                complexity_classes.append([composition])
 
         stitched_compositions = []
-
-        for equal_complexity_list in classes:
-            final_composition = Composition.stitch(equal_complexity_list)
-            final_composition.final_complexity = Composition.get_average_complexity_class(equal_complexity_list,
-                                                                                          track_identifier)
-            stitched_compositions.append(final_composition)
+        for complexity_class in complexity_classes:
+            complexity = complexity_class[0].get_track(track_identifier).complexity()
+            composition = Composition.stitch(complexity_class)
+            composition.final_complexity = complexity
+            stitched_compositions.append(composition)
 
         return stitched_compositions
 

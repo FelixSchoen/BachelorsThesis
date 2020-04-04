@@ -126,21 +126,19 @@ class CompositionSuite(unittest.TestCase):
     def test_composition_split_to_bars(self):
         self.composition.split_to_bars()
 
-    def test_composition_stitch_to_equal_difficulty_classes(self):
-        Composition.stitch_to_equal_difficulty_classes(self.composition.split_to_bars(), Composition.RIGHT_HAND)
+    def test_composition_stitch_equal_complexity(self):
+        comps = Composition.stitch_equal_complexity(self.composition.split_to_bars(), Constants.RIGHT_HAND)
+        for i, comp in enumerate(comps):
+            comp.to_midi_file().save("./out/num"+str(i)+"compl"+str(comp.final_complexity)+".mid")
 
     def test_composition_get_split_timing(self):
         Composition.get_split_timing(self.midi_file.tracks[0])
 
     def test_composition_get_track(self):
-        self.composition.get_track(Composition.RIGHT_HAND)
-
-    def test_composition_get_average_complexity_class(self):
-        Composition.get_average_complexity_class(
-            [self.composition.split_to_bars()[0], self.composition.split_to_bars()[1]], Composition.RIGHT_HAND)
+        self.composition.get_track(Constants.RIGHT_HAND)
 
     def test_composition_to_neuron_representation(self):
-        self.composition.to_neuron_representation(Composition.RIGHT_HAND)
+        self.composition.to_neuron_representation(Constants.RIGHT_HAND)
 
 
 class MetaDataSuite(unittest.TestCase):

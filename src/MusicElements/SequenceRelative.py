@@ -140,7 +140,7 @@ class SequenceRelative(AbstractSequence, Persistable):
         self.elements = elements_adjusted
 
         # Fill bar
-        if self.elements[-1].message_type == MessageType.wait:
+        if len(self.elements) > 0 and self.elements[-1].message_type == MessageType.wait:
             wait_message = self.elements.pop(-1)
             total_wait_time -= wait_message.value
         ticks_in_bar = 4 * internal_ticks * self.numerator / self.denominator

@@ -6,17 +6,17 @@ from src.MusicElements import *
 from src.Utility import *
 from mido import MidiFile
 
-EPOCHS = 7
-BATCH_SIZE = 1
+EPOCHS = 10
+BATCH_SIZE = 4
 BUFFER_SIZE = 2048
 
 SAVE_PATH = "../../out/net/lead"
 CHECKPOINT_NAME = "cp_{epoch}"
-MODEL_NAME = "model_full.h5"
+MODEL_NAME = "model.h5"
 
 VOCAB_SIZE = 200
-NEURON_LIST = (1024, 512, 512)
-DROPOUT = 0.25
+NEURON_LIST = (512, 256, 256)
+DROPOUT = 0.2
 EMBEDDING_DIM = 3
 
 
@@ -69,6 +69,51 @@ def setup_tensorflow():
     tf.get_logger().setLevel("ERROR")
 
 
+def load_model():
+    # Build model
+    model = build_model()
+
+    # Try to load existing weights
+    try:
+        model.load_weights(tf.train.latest_checkpoint(SAVE_PATH))
+    except AttributeError:
+        print("Weights could not be loaded")
+
+    # Compile model
+    model.compile(optimizer="rmsprop", loss=loss)
+
+    return model
+
+
+def load_pickle_data(complexity):
+    if complexity == Complexity.EASY:
+        path = "../../out/lib/4-4/easy"
+    elif complexity == Complexity.MEDIUM:
+        path = "../../out/lib/4-4/medium"
+    else:
+        path = "../../out/lib/4-4/hard"
+
+    sequences = []
+
+    for (dirpath, dirnames, filenames) in os.walk(path):
+        for name in filenames:
+            print("Loading composition: " + name + " ... ", end="")
+            try:
+                filepath = path + "/" + name
+                equal_class = Composition.from_file(filepath)
+                for i in range(-5, 7):
+                    sequences.append(equal_class.right_hand.transpose(i).to_neuron_representation())
+                print("Done!")
+            except Exception as e:
+                print(e)
+
+    padded_sequences = tf.keras.preprocessing.sequence.pad_sequences(sequences, padding="post")
+    dataset = tf.data.Dataset.from_tensor_slices(padded_sequences)
+    dataset_split = dataset.map(split)
+    dataset_batches = dataset_split.shuffle(BUFFER_SIZE).batch(BATCH_SIZE, drop_remainder=True)
+    return dataset_batches
+
+
 def load_data():
     filepaths = []
 
@@ -108,27 +153,11 @@ def load_data():
     return dataset_batches
 
 
-def load_model():
-    # Build model
-    model = build_model()
-
-    # Try to load existing weights
-    try:
-        model.load_weights(tf.train.latest_checkpoint(SAVE_PATH))
-    except AttributeError:
-        print("Weights could not be loaded")
-
-    # Compile model
-    model.compile(optimizer="rmsprop", loss=loss)
-
-    return model
-
-
 def generate_data(start_sequence, number_of_elements, temperature=1.0):
     # Load model with batch size of 1
     model = build_model(batch_size=1)
 
-    model.load_weights(os.path.join(SAVE_PATH, MODEL_NAME))
+    model.load_weights(os.path.join(SAVE_PATH, "model_medium.h5"))
 
     model.build(tf.TensorShape([1, None]))
 
@@ -136,8 +165,6 @@ def generate_data(start_sequence, number_of_elements, temperature=1.0):
 
     input_values = start_sequence
     input_values = tf.expand_dims(input_values, 0)
-
-    print(input_values)
 
     model.reset_states()
     for i in range(number_of_elements):
@@ -156,21 +183,79 @@ def generate_data(start_sequence, number_of_elements, temperature=1.0):
 
     return generated
 
+def generate_bar(model, temperature, start_sequence) -> SequenceRelative:
+    numerator = 4
+    denominator = 4
+
+    max_time = 4 * numerator / denominator * internal_ticks
+    wait_time = 0
+    generated = []
+
+    for value in start_sequence:
+        element = Element.from_neuron_representation(value)
+        generated.append(element)
+        if element.message_type == MessageType.wait:
+            wait_time += element.value
+
+    input_values = start_sequence
+    input_values = tf.expand_dims(input_values, 0)
+
+    model.reset_states()
+    while wait_time < max_time:
+        predictions = model(input_values)
+        # List of batches with size 1 to list of generated elements
+        predictions = tf.squeeze(predictions, 0)
+
+        predictions = predictions / temperature
+        predicted = tf.random.categorical(predictions, num_samples=1)[-1, 0].numpy()
+
+        if predicted == 0:
+            continue
+
+        input_values = tf.expand_dims([predicted], 0)
+        element = Element.from_neuron_representation(predicted)
+        if element.message_type == MessageType.wait:
+            wait_time += element.value
+        generated.append(element)
+
+    sequence = SequenceRelative(numerator, denominator)
+    sequence.elements = generated
+    return sequence.split(max_time)[0].adjust()
+
+
 
 if __name__ == "__main__":
+    MODEL_NAME = "model_medium.h5"
     setup_tensorflow()
-    data = load_data()
-    model = load_model()
 
-    model.summary()
-    print()
-    print(data)
+    # data = load_pickle_data(Complexity.MEDIUM)
+    # model = load_model()
+    #
+    # model.summary()
+    # print()
+    # print(data)
+    #
+    # callback = tf.keras.callbacks.ModelCheckpoint(filepath=os.path.join(SAVE_PATH, CHECKPOINT_NAME),
+    #                                               save_weights_only=True)
+    # model.fit(data, epochs=EPOCHS, callbacks=[callback], verbose=1)
+    #
+    # model.save_weights(os.path.join(SAVE_PATH, MODEL_NAME))
 
-    callback = tf.keras.callbacks.ModelCheckpoint(filepath=os.path.join(SAVE_PATH, CHECKPOINT_NAME),
-                                                  save_weights_only=True)
-    model.fit(data, epochs=EPOCHS, callbacks=[callback], verbose=1)
+    # GENERATE
 
-    model.save_weights(os.path.join(SAVE_PATH, MODEL_NAME))
+    # Load model with batch size of 1
+    model = build_model(batch_size=1)
+
+    model.load_weights(os.path.join(SAVE_PATH, "model_medium.h5"))
+
+    model.build(tf.TensorShape([1, None]))
+
+    seq = generate_bar(model, 1.0, [147])
+    print(seq)
+
+    file = MidiFile()
+    file.tracks.append(seq.to_midi_track())
+    file.save("out.mid")
 
     # generated = generate_data([100], 250, temperature=0.5)
     #

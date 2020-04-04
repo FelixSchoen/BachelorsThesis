@@ -46,57 +46,6 @@ class SequenceRelativeSuite(unittest.TestCase):
     def test_sequence_complexity(self):
         self.sequence.split_to_bars()[0].complexity()
 
-    @staticmethod
-    def calculate_complexity(name, midi_file, easy, medium, hard):
-        try:
-            compositions = Composition.from_midi_file(midi_file)
-            for composition in compositions:
-                if composition.numerator / composition.denominator != 4 / 4:
-                    continue
-                bars = composition.split_to_bars()
-                for i, bar in enumerate(bars):
-                    complexity = bar.right_hand.complexity()
-                    if complexity == Complexity.EASY:
-                        easy.append(bar.right_hand)
-                    elif complexity == Complexity.MEDIUM:
-                        medium.append(bar.right_hand)
-                    else:
-                        hard.append(bar.right_hand)
-        except Exception as e:
-            print(e)
-            print(Fore.RED + "Exception " + str(name) + Style.RESET_ALL)
-
-    def test_mest(self):
-        seq = SequenceRelative()
-        seq.elements.append(Element(MessageType.play, 24, 64))
-        seq.elements.append(Element(MessageType.wait, 24, 64))
-        seq.elements.append(Element(MessageType.stop, 24, 64))
-        seq.elements.append(Element(MessageType.wait, 22, 64))
-
-        print(seq)
-        seq.adjust()
-        print(seq)
-
-    def test_test(self):
-        easy = []
-        medium = []
-        hard = []
-
-        executor = ThreadPoolExecutor()
-
-        directories = []
-        for (dirpath, dirnames, filenames) in os.walk("../res/midi"):
-            for name in filenames:
-                directories.append(dirpath + "/" + name)
-        # directories = Util.util_remove_elements(directories, 1)
-
-        for filepath in directories:
-            midi_file = MidiFile(filepath)
-            executor.submit(SequenceRelativeSuite.calculate_complexity, filepath, midi_file, easy, medium, hard)
-
-        print("Easy: {easy}, Medium: {medium}, Hard: {hard}".format(easy=len(easy), medium=len(medium),
-                                                                    hard=len(hard)))
-
 
 class SequenceAbsoluteSuite(unittest.TestCase):
     midi_file = MidiFile()
@@ -104,6 +53,15 @@ class SequenceAbsoluteSuite(unittest.TestCase):
 
     def test_quantize(self):
         print(SequenceAbsolute.quantize_value(1))
+
+    def test_cutoff(self):
+        cut_file = MidiFile("res/cutoff.mid")
+        cut_seq = SequenceRelative.from_midi_track(cut_file.tracks[0])
+        cut_seq.to_absolute_sequence().cutoff(24).to_relative_sequence().adjust()
+
+        mid = MidiFile()
+        mid.tracks.append(cut_seq.to_midi_track())
+        mid.save("out.mid")
 
 
 class CompositionSuite(unittest.TestCase):
@@ -129,7 +87,7 @@ class CompositionSuite(unittest.TestCase):
     def test_composition_stitch_equal_complexity(self):
         comps = Composition.stitch_equal_complexity(self.composition.split_to_bars(), Constants.RIGHT_HAND)
         for i, comp in enumerate(comps):
-            comp.to_midi_file().save("./out/num"+str(i)+"compl"+str(comp.final_complexity)+".mid")
+            comp.to_midi_file().save("./out/num" + str(i) + "compl" + str(comp.final_complexity) + ".mid")
 
     def test_composition_get_split_timing(self):
         Composition.get_split_timing(self.midi_file.tracks[0])

@@ -6,8 +6,8 @@ from src.MusicElements import *
 from src.Utility import *
 from mido import MidiFile
 
-EPOCHS = 10
-BATCH_SIZE = 4
+EPOCHS = 30
+BATCH_SIZE = 32
 BUFFER_SIZE = 2048
 
 SAVE_PATH = "../../out/net/lead"
@@ -15,9 +15,9 @@ CHECKPOINT_NAME = "cp_{epoch}"
 MODEL_NAME = "model.h5"
 
 VOCAB_SIZE = 200
-NEURON_LIST = (512, 256, 256)
+NEURON_LIST = (1024, 1024, 0)
 DROPOUT = 0.2
-EMBEDDING_DIM = 3
+EMBEDDING_DIM = 16
 
 
 # BEGIN TENSORFLOW CONFIGURATION
@@ -29,7 +29,6 @@ def build_model(neuron_list=NEURON_LIST, batch_size=BATCH_SIZE, dropout=DROPOUT,
                                   embedding_dim,
                                   batch_input_shape=[batch_size, None],
                                   mask_zero=True),
-        tf.keras.layers.Dropout(dropout),
         tf.keras.layers.LSTM(neuron_list[0],
                              return_sequences=True,
                              stateful=True,
@@ -39,8 +38,12 @@ def build_model(neuron_list=NEURON_LIST, batch_size=BATCH_SIZE, dropout=DROPOUT,
                              return_sequences=True,
                              stateful=True,
                              recurrent_initializer='glorot_uniform'),
-        tf.keras.layers.Dense(neuron_list[2]),
         tf.keras.layers.Dropout(dropout),
+        # tf.keras.layers.LSTM(neuron_list[2],
+        #                      return_sequences=True,
+        #                      stateful=True,
+        #                      recurrent_initializer='glorot_uniform'),
+        # tf.keras.layers.Dropout(dropout),
         tf.keras.layers.Dense(VOCAB_SIZE + 1)
     ])
     return model
@@ -80,7 +83,7 @@ def load_model():
         print("Weights could not be loaded")
 
     # Compile model
-    model.compile(optimizer="rmsprop", loss=loss)
+    model.compile(optimizer="adam", loss=loss)
 
     return model
 
@@ -183,20 +186,25 @@ def generate_data(start_sequence, number_of_elements, temperature=1.0):
 
     return generated
 
-def generate_bar(model, temperature, start_sequence) -> SequenceRelative:
+
+def generate_bars(model, temperature, start_sequence, amount) -> SequenceRelative:
     numerator = 4
     denominator = 4
 
-    max_time = 4 * numerator / denominator * internal_ticks
+    # Calculate maximum time for bars
+    max_time = 4 * numerator / denominator * internal_ticks * amount
     wait_time = 0
+
     generated = []
 
+    # Append start sequence and add to wait time
     for value in start_sequence:
         element = Element.from_neuron_representation(value)
         generated.append(element)
         if element.message_type == MessageType.wait:
             wait_time += element.value
 
+    # Convert input values
     input_values = start_sequence
     input_values = tf.expand_dims(input_values, 0)
 
@@ -206,13 +214,18 @@ def generate_bar(model, temperature, start_sequence) -> SequenceRelative:
         # List of batches with size 1 to list of generated elements
         predictions = tf.squeeze(predictions, 0)
 
+        # Truncated sampling
         predictions = predictions / temperature
         predicted = tf.random.categorical(predictions, num_samples=1)[-1, 0].numpy()
 
         if predicted == 0:
+            # Padding value
             continue
 
+        # Last element to predicted elements
         input_values = tf.expand_dims([predicted], 0)
+
+        # Add element to generated elements and add to wait time
         element = Element.from_neuron_representation(predicted)
         if element.message_type == MessageType.wait:
             wait_time += element.value
@@ -220,54 +233,61 @@ def generate_bar(model, temperature, start_sequence) -> SequenceRelative:
 
     sequence = SequenceRelative(numerator, denominator)
     sequence.elements = generated
-    return sequence.split(max_time)[0].adjust()
+    return sequence.split(max_time)[0]
 
+
+def train():
+    data = load_pickle_data(Complexity.MEDIUM)
+    model = load_model()
+
+    model.summary()
+    print()
+    print(data)
+
+    callback = tf.keras.callbacks.ModelCheckpoint(filepath=os.path.join(SAVE_PATH, CHECKPOINT_NAME),
+                                                  save_weights_only=True)
+
+    model.fit(data, epochs=EPOCHS, callbacks=[callback], verbose=1)
+
+    model.save_weights(os.path.join(SAVE_PATH, MODEL_NAME))
+
+
+def generate(checkpoint: int = None, temp=1.0):
+    # GENERATE
+
+    # Try generate bar
+
+    # Load model with batch size of 1
+    model = build_model(batch_size=1)
+
+    if checkpoint is None:
+        model.load_weights(tf.train.latest_checkpoint(SAVE_PATH))
+    else:
+        model.load_weights(SAVE_PATH + "\cp_" + str(checkpoint))
+
+    # To load model
+    # model.load_weights(os.path.join(SAVE_PATH, "model_medium.h5"))
+
+    model.build(tf.TensorShape([1, None]))
+
+    seq = generate_bars(model, temp, [155], 8)
+    seq = seq.to_absolute_sequence().quantize().to_relative_sequence().adjust()
+    print(seq)
+
+    file = MidiFile()
+    file.tracks.append(seq.to_midi_track())
+    file.save("out/o_epoch-" + str(checkpoint) + "_temp-" + str(temp) + "_nocutoff.mid")
+
+    seq = seq.to_absolute_sequence().cutoff(force=True).to_relative_sequence().adjust()
+    file = MidiFile()
+    file.tracks.append(seq.to_midi_track())
+    file.save("out/o_epoch-" + str(checkpoint) + "_temp-" + str(temp) + "_cutoff.mid")
 
 
 if __name__ == "__main__":
     MODEL_NAME = "model_medium.h5"
     setup_tensorflow()
 
-    # data = load_pickle_data(Complexity.MEDIUM)
-    # model = load_model()
-    #
-    # model.summary()
-    # print()
-    # print(data)
-    #
-    # callback = tf.keras.callbacks.ModelCheckpoint(filepath=os.path.join(SAVE_PATH, CHECKPOINT_NAME),
-    #                                               save_weights_only=True)
-    # model.fit(data, epochs=EPOCHS, callbacks=[callback], verbose=1)
-    #
-    # model.save_weights(os.path.join(SAVE_PATH, MODEL_NAME))
-
-    # GENERATE
-
-    # Load model with batch size of 1
-    model = build_model(batch_size=1)
-
-    model.load_weights(os.path.join(SAVE_PATH, "model_medium.h5"))
-
-    model.build(tf.TensorShape([1, None]))
-
-    seq = generate_bar(model, 1.0, [147])
-    print(seq)
-
-    file = MidiFile()
-    file.tracks.append(seq.to_midi_track())
-    file.save("out.mid")
-
-    # generated = generate_data([100], 250, temperature=0.5)
-    #
-    # final = []
-    # for num in generated:
-    #     final.append(Element.from_neuron_representation(num))
-    #
-    # seq = SequenceRelative()
-    # seq.elements = final
-    # print(final)
-    # seq.adjust().adjust()
-    # print(seq)
-    # file = MidiFile()
-    # file.tracks.append(seq.to_midi_track())
-    # file.save("out.mid")
+    # train()
+    # for i in range(10, 16):
+    generate(16,temp=1.5)

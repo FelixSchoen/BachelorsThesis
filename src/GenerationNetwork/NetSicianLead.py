@@ -10,12 +10,12 @@ EPOCHS = 30
 BATCH_SIZE = 32
 BUFFER_SIZE = 2048
 
-SAVE_PATH = "../../out/net/lead"
+SAVE_PATH = "../../out/net/lead/medium"
 CHECKPOINT_NAME = "cp_{epoch}"
 MODEL_NAME = "model.h5"
 
 VOCAB_SIZE = 200
-NEURON_LIST = (1024, 1024, 0)
+NEURON_LIST = (1024, 1024, 1024)
 DROPOUT = 0.2
 EMBEDDING_DIM = 16
 
@@ -39,11 +39,11 @@ def build_model(neuron_list=NEURON_LIST, batch_size=BATCH_SIZE, dropout=DROPOUT,
                              stateful=True,
                              recurrent_initializer='glorot_uniform'),
         tf.keras.layers.Dropout(dropout),
-        # tf.keras.layers.LSTM(neuron_list[2],
-        #                      return_sequences=True,
-        #                      stateful=True,
-        #                      recurrent_initializer='glorot_uniform'),
-        # tf.keras.layers.Dropout(dropout),
+        tf.keras.layers.LSTM(neuron_list[2],
+                             return_sequences=True,
+                             stateful=True,
+                             recurrent_initializer='glorot_uniform'),
+        tf.keras.layers.Dropout(dropout),
         tf.keras.layers.Dense(VOCAB_SIZE + 1)
     ])
     return model
@@ -72,23 +72,7 @@ def setup_tensorflow():
     tf.get_logger().setLevel("ERROR")
 
 
-def load_model():
-    # Build model
-    model = build_model()
-
-    # Try to load existing weights
-    try:
-        model.load_weights(tf.train.latest_checkpoint(SAVE_PATH))
-    except AttributeError:
-        print("Weights could not be loaded")
-
-    # Compile model
-    model.compile(optimizer="adam", loss=loss)
-
-    return model
-
-
-def load_pickle_data(complexity):
+def load_pickle_data(complexity, batch_size=BATCH_SIZE):
     if complexity == Complexity.EASY:
         path = "../../out/lib/4-4/easy"
     elif complexity == Complexity.MEDIUM:
@@ -113,7 +97,7 @@ def load_pickle_data(complexity):
     padded_sequences = tf.keras.preprocessing.sequence.pad_sequences(sequences, padding="post")
     dataset = tf.data.Dataset.from_tensor_slices(padded_sequences)
     dataset_split = dataset.map(split)
-    dataset_batches = dataset_split.shuffle(BUFFER_SIZE).batch(BATCH_SIZE, drop_remainder=True)
+    dataset_batches = dataset_split.shuffle(BUFFER_SIZE).batch(batch_size, drop_remainder=True)
     return dataset_batches
 
 
@@ -236,20 +220,32 @@ def generate_bars(model, temperature, start_sequence, amount) -> SequenceRelativ
     return sequence.split(max_time)[0]
 
 
-def train():
-    data = load_pickle_data(Complexity.MEDIUM)
-    model = load_model()
+def train(save_path, neuron_list, batch_size, name):
+    data = load_pickle_data(Complexity.MEDIUM, batch_size)
+    # Build model
+    model = build_model(neuron_list=neuron_list, batch_size=batch_size)
+
+    # # Try to load existing weights
+    # try:
+    #     model.load_weights(tf.train.latest_checkpoint(save_path))
+    # except AttributeError:
+    #     print("Weights could not be loaded")
+
+    # Compile model
+    model.compile(optimizer="adam", loss=loss)
 
     model.summary()
     print()
     print(data)
 
-    callback = tf.keras.callbacks.ModelCheckpoint(filepath=os.path.join(SAVE_PATH, CHECKPOINT_NAME),
+    callback = tf.keras.callbacks.ModelCheckpoint(filepath=os.path.join(save_path, CHECKPOINT_NAME),
                                                   save_weights_only=True)
 
     model.fit(data, epochs=EPOCHS, callbacks=[callback], verbose=1)
 
-    model.save_weights(os.path.join(SAVE_PATH, MODEL_NAME))
+    model.save_weights(os.path.join(save_path, name))
+
+    data = None
 
 
 def generate(checkpoint: int = None, temp=1.0):
@@ -285,9 +281,19 @@ def generate(checkpoint: int = None, temp=1.0):
 
 
 if __name__ == "__main__":
-    MODEL_NAME = "model_medium.h5"
     setup_tensorflow()
 
-    # train()
+    path = "../../out/net/lead/medium/2048x1024x2"
+    list = (2048, 1024, 1024)
+    size = 24
+    name = "model_3l_2048-1024x2_30e_24b_16em.h5"
+    train(save_path=path, neuron_list=list, batch_size=size, name=name)
+
+    path = "../../out/net/lead/medium/2048x3"
+    list = (2048, 1024, 1024)
+    size = 16
+    name = "model_3l_2048-1024x2_30e_16b_16em.h5"
+    train(save_path=path, neuron_list=list, batch_size=size, name=name)
+
     # for i in range(10, 16):
-    generate(16,temp=1.5)
+    # generate(16,temp=1.5)

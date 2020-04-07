@@ -3,13 +3,37 @@ from __future__ import print_function
 import keras as K
 import tensorflow as tf
 from keras.models import Model
-from keras.layers import Input, LSTM, Dense
+from keras.layers import Input, LSTM, Dense, Embedding
 from src.Utility import *
 from src.MusicElements import *
 import numpy as np
 import os
 
+EPOCHS = 30
+BATCH_SIZE = 32
+BUFFER_SIZE = 4096
+
 VOCAB_SIZE = 203
+NEURON_LIST = (1024, 1024)
+DROPOUT = 0.2
+EMBEDDING_DIM = 16
+
+def build_model(neuron_list=NEURON_LIST, batch_size=BATCH_SIZE, dropout=DROPOUT, embedding_dim=EMBEDDING_DIM):
+    # Encoder Model
+    enc_input_layer = Input(shape=(None,))
+    enc_embedding_layer = Embedding(VOCAB_SIZE, neuron_list[0])(enc_input_layer)
+    enc_hidden1_layer, state_h, state_c = LSTM(neuron_list[-1], return_state=True)(enc_embedding_layer) # TODO Change front embedding layer (different var?)
+
+    enc_states = [state_h, state_c]
+
+    # Decoder Model
+    dec_input_layer = Input(shape=(None,))
+    dec_embedding_layer = Embedding(VOCAB_SIZE, neuron_list[0])(dec_input_layer)
+    dec_hidden1_layer = LSTM(neuron_list[-1], return_sequences=True)(dec_embedding_layer, initial_state=enc_states)
+    dec_output_layer = Dense(VOCAB_SIZE, activation="softmax")(dec_hidden1_layer)
+
+    return Model([enc_input_layer, dec_input_layer], dec_output_layer)
+
 
 
 def shizzle():
@@ -20,7 +44,7 @@ def shizzle():
     # Path to the data txt file on disk.
     data_path = 'fra-eng/fra.txt'
 
-    treble_sequences, bass_sequences, target = load_pickle_data(Complexity.MEDIUM, batch_size)
+    treble_sequences, bass_sequences, target_sequences = load_pickle_data(Complexity.MEDIUM, batch_size)
 
     # Define an input sequence and process it.
     encoder_inputs = Input(shape=(None,))
@@ -29,26 +53,15 @@ def shizzle():
     # We discard `encoder_outputs` and only keep the states.
     encoder_states = [state_h, state_c]
 
-    # Set up the decoder, using `encoder_states` as initial state.
-    decoder_inputs = Input(shape=(None,))
-    x = K.layers.Embedding(VOCAB_SIZE, latent_dim)(decoder_inputs)
-    x = LSTM(latent_dim, return_sequences=True)(x, initial_state=encoder_states)
-    decoder_outputs = Dense(VOCAB_SIZE, activation="softmax")(x)
-    # We set up our decoder to return full output sequences,
-    # and to return internal states as well. We don't use the
-    # return states in the training model, but we will use them in inference.
-
-    # Define the model that will turn
-    # `encoder_input_data` & `decoder_input_data` into `decoder_target_data`
-    model = Model([encoder_inputs, decoder_inputs], decoder_outputs)
+    model = build_model()
+    model.summary()
 
     # Run training
     model.compile(optimizer='rmsprop', loss='categorical_crossentropy',
                   metrics=['accuracy'])
-    model.fit([treble_sequences, bass_sequences], target,
-              batch_size=128,
-              epochs=epochs,
-              validation_split=0.2)
+    model.fit([treble_sequences, bass_sequences], target_sequences,
+              batch_size=BATCH_SIZE,
+              epochs=epochs)
     # Save model
     model.save('s2s.h5')
 

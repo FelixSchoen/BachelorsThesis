@@ -7,8 +7,8 @@ from src.Utility import *
 from mido import MidiFile
 
 EPOCHS = 30
-BATCH_SIZE = 32
-BUFFER_SIZE = 2048
+BATCH_SIZE = 64
+BUFFER_SIZE = 4096
 
 SAVE_PATH = "../../out/net/lead/medium"
 CHECKPOINT_NAME = "cp_{epoch}"
@@ -244,8 +244,6 @@ def train(save_path, neuron_list, batch_size, name):
     model.fit(data, epochs=EPOCHS, callbacks=[callback], verbose=1)
 
     model.save_weights(os.path.join(save_path, name))
-
-    data = None
 
 
 def generate(checkpoint: int = None, temp=1.0):

@@ -3,6 +3,9 @@ from enum import Enum
 RIGHT_HAND = 0
 LEFT_HAND = 1
 
+START_WORD = 201
+END_WORD = 202
+
 std_velocity = 64
 internal_ticks = 24
 external_ticks = 480

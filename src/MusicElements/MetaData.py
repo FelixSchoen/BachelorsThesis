@@ -62,14 +62,17 @@ class MessageType(Enum):
     play = 0
     stop = 1
     wait = 2
+    meta = 3
 
     def __str__(self):
         if self.value == 0:
             return "p"
         elif self.value == 1:
             return "s"
-        else:
+        elif self.value == 2:
             return "w"
+        else:
+            return "m"
 
 
 class ComplexityRating:
@@ -118,6 +121,8 @@ class Element:
             return self.value - 21 + 88 + add
         elif self.message_type == MessageType.wait:
             return self.value - 1 + 88 * 2 + add
+        elif self.message_type == MessageType.meta:
+            return self.value + 201
 
     @staticmethod
     def from_neuron_representation(value: int, padding: bool = True) -> Element:

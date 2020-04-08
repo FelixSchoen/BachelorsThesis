@@ -5,6 +5,7 @@ LEFT_HAND = 1
 
 START_WORD = 201
 END_WORD = 202
+PADDING = 0
 
 std_velocity = 64
 internal_ticks = 24

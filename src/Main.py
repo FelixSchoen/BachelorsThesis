@@ -49,16 +49,16 @@ def judge_difficulty_stitch_and_persist(name, midi_file):
     try:
         compositions = Composition.from_midi_file(midi_file)
         for composition in compositions:
-            if composition.numerator / composition.denominator != 4 / 4:
+            if composition.denominator != 4:
                 continue
             equal_classes = Composition.stitch_equal_complexity(composition.split_to_bars(), Constants.RIGHT_HAND)
             for i, equal_class in enumerate(equal_classes):
                 if equal_class.final_complexity == Complexity.EASY:
-                    equal_class.to_file("../out/lib/4-4/easy/"+name+"-"+str(i)+".pkl")
+                    equal_class.to_midi_file().save("../out/lib/easy/" + name + "-" + str(i) + ".mid")
                 elif equal_class.final_complexity == Complexity.MEDIUM:
-                    equal_class.to_file("../out/lib/4-4/medium/"+name+"-"+str(i)+".pkl")
+                    equal_class.to_midi_file().save("../out/lib/medium/" + name + "-" + str(i) + ".mid")
                 else:
-                    equal_class.to_file("../out/lib/4-4/hard/"+name+"-"+str(i)+".pkl")
+                    equal_class.to_midi_file().save("../out/lib/hard/" + name + "-" + str(i) + ".mid")
 
     except Exception as e:
         print(name, e)

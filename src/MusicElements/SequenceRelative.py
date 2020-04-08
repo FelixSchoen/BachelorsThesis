@@ -77,7 +77,10 @@ class SequenceRelative(AbstractSequence, Persistable):
     def from_neural_representation(representation: list[int], numerator: int = 4, denominator: int = 4):
         sequence = SequenceRelative(numerator=numerator, denominator=denominator)
         for value in representation:
+            if value == Constants.START_WORD or value == Constants.END_WORD or value == Constants.PADDING:
+                continue
             sequence.elements.append(Element.from_neuron_representation(value))
+        return sequence
 
     def to_neural_representation(self) -> list[int]:
         representation = []

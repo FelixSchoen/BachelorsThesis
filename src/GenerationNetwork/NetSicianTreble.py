@@ -140,37 +140,6 @@ def load_data():
     return dataset_batches
 
 
-def generate_data(start_sequence, number_of_elements, temperature=1.0):
-    # Load model with batch size of 1
-    model = build_model(batch_size=1)
-
-    model.load_weights(os.path.join(SAVE_PATH, "model_medium.h5"))
-
-    model.build(tf.TensorShape([1, None]))
-
-    generated = []
-
-    input_values = start_sequence
-    input_values = tf.expand_dims(input_values, 0)
-
-    model.reset_states()
-    for i in range(number_of_elements):
-        predictions = model(input_values)
-        # List of batches with size 1 to list of generated elements
-        predictions = tf.squeeze(predictions, 0)
-
-        predictions = predictions / temperature
-        predicted = tf.random.categorical(predictions, num_samples=1)[-1, 0].numpy()
-
-        if predicted == 0:
-            continue
-
-        input_values = tf.expand_dims([predicted], 0)
-        generated.append(predicted)
-
-    return generated
-
-
 def generate_bars(model, temperature, start_sequence, amount) -> SequenceRelative:
     numerator = 4
     denominator = 4

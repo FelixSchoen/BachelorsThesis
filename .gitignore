@@ -1,3 +1,4 @@
-out/
+out/gen
+out/net
 /test/res/
 /res/

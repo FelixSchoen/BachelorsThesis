@@ -10,30 +10,67 @@ import numpy as np
 import os
 
 EPOCHS = 30
-BATCH_SIZE = 32
+BATCH_SIZE = 256
 BUFFER_SIZE = 4096
 
 VOCAB_SIZE = 203
-NEURON_LIST = (1024, 1024)
+NEURON_LIST = (64, 64)
 DROPOUT = 0.2
 EMBEDDING_DIM = 16
 
-def build_model(neuron_list=NEURON_LIST, batch_size=BATCH_SIZE, dropout=DROPOUT, embedding_dim=EMBEDDING_DIM):
-    # Encoder Model
-    enc_input_layer = Input(shape=(None,))
-    enc_embedding_layer = Embedding(VOCAB_SIZE, neuron_list[0])(enc_input_layer)
-    enc_hidden1_layer, state_h, state_c = LSTM(neuron_list[-1], return_state=True)(enc_embedding_layer) # TODO Change front embedding layer (different var?)
 
-    enc_states = [state_h, state_c]
+def build_models(neuron_list=NEURON_LIST):
+    # Encoder Model
+    enc_layer_input = Input(shape=(None,), name="Enc_Input")
+    enc_layer_embedding = Embedding(VOCAB_SIZE, neuron_list[0], mask_zero=True, name="Enc_Embedding")
+    enc_layer_hidden_0 = LSTM(neuron_list[-1], return_state=True, name="Enc_Hidden_0")
+
+    # Apply Layers
+    enc_output_embedding = enc_layer_embedding(enc_layer_input)
+    enc_output_hidden_0, enc_h0, enc_c0 = enc_layer_hidden_0(enc_output_embedding)
+
+    # States
+    enc_states = [enc_h0, enc_c0]
 
     # Decoder Model
-    dec_input_layer = Input(shape=(None,))
-    dec_embedding_layer = Embedding(VOCAB_SIZE, neuron_list[0])(dec_input_layer)
-    dec_hidden1_layer = LSTM(neuron_list[-1], return_sequences=True)(dec_embedding_layer, initial_state=enc_states)
-    dec_output_layer = Dense(VOCAB_SIZE, activation="softmax")(dec_hidden1_layer)
+    dec_layer_input = Input(shape=(None,), name="Dec_Input")
+    dec_layer_embedding = Embedding(VOCAB_SIZE, neuron_list[0], mask_zero=True, name="Dec_Embedding")
+    dec_layer_hidden_0 = LSTM(neuron_list[-1], return_sequences=True, return_state=True, name="Dec_Hidden_0")
+    dec_layer_output = Dense(VOCAB_SIZE, activation="softmax", name="Dec_Output")
 
-    return Model([enc_input_layer, dec_input_layer], dec_output_layer)
+    # Apply Layers
+    dec_output_embedding = dec_layer_embedding(dec_layer_input)
+    dec_output_hidden_0, dec_h0, dec_c0 = dec_layer_hidden_0(dec_output_embedding, initial_state=enc_states[0:2])
+    dec_output_output = dec_layer_output(dec_output_hidden_0)
 
+    training_model = Model(inputs=[enc_layer_input, dec_layer_input], outputs=dec_output_output, name="Training_Model")
+    training_model.summary()
+
+    # =========
+    # Inference
+    # =========
+
+    # Encoder
+    ienc_model = Model(inputs=enc_layer_input, outputs=enc_states, name="Inference_Encoder_Model")
+    ienc_model.summary()
+
+    # Decoder Model
+    idec_layer_input_h0 = Input(shape=(neuron_list[0],), name="IDec_Input_h0")
+    idec_layer_input_c0 = Input(shape=(neuron_list[0],), name="IDec_Input_c0")
+    idec_states_input = [idec_layer_input_h0, idec_layer_input_c0]
+
+    # Apply Layers
+    idec_output_embedding = dec_layer_embedding(dec_layer_input)
+    idec_output_hidden_0, idec_h0, idec_c0 = dec_layer_hidden_0(idec_output_embedding,
+                                                                initial_state=idec_states_input[0:2])
+    idec_output_output = dec_layer_output(idec_output_hidden_0)
+
+    idec_states = [idec_h0, idec_c0]
+
+    idec_model = Model(inputs=[dec_layer_input] + idec_states_input, outputs=[idec_output_output] + idec_states, name="Interference_Decoder_Model")
+    idec_model.summary()
+
+    return training_model, ienc_model, idec_model
 
 
 def shizzle():
@@ -41,29 +78,21 @@ def shizzle():
     epochs = 100  # Number of epochs to train for.
     latent_dim = 256  # Latent dimensionality of the encoding space.
     num_samples = 10000  # Number of samples to train on.
-    # Path to the data txt file on disk.
-    data_path = 'fra-eng/fra.txt'
 
     treble_sequences, bass_sequences, target_sequences = load_pickle_data(Complexity.MEDIUM, batch_size)
 
-    # Define an input sequence and process it.
-    encoder_inputs = Input(shape=(None,))
-    x = K.layers.Embedding(VOCAB_SIZE, latent_dim)(encoder_inputs)
-    x, state_h, state_c = LSTM(latent_dim, return_state=True)(x)
-    # We discard `encoder_outputs` and only keep the states.
-    encoder_states = [state_h, state_c]
-
-    model = build_model()
-    model.summary()
-
-    # Run training
-    model.compile(optimizer='rmsprop', loss='categorical_crossentropy',
-                  metrics=['accuracy'])
-    model.fit([treble_sequences, bass_sequences], target_sequences,
-              batch_size=BATCH_SIZE,
-              epochs=epochs)
-    # Save model
-    model.save('s2s.h5')
+    models = build_models()[0]
+    # training_model = models[0]
+    # training_model.summary()
+    #
+    # # Run training
+    # training_model.compile(optimizer='rmsprop', loss='categorical_crossentropy',
+    #                        metrics=['accuracy'])
+    # model.fit([treble_sequences, bass_sequences], target_sequences,
+    #           batch_size=BATCH_SIZE,
+    #           epochs=epochs)
+    # # Save model
+    # model.save('s2s.h5')
 
 
 def split(chunk):
@@ -101,7 +130,7 @@ def load_pickle_data(complexity, batch_size):
                 print(e)
 
     target_sequences = np.zeros((len(bass_sequences), max(len(sequence) for sequence in bass_sequences), VOCAB_SIZE),
-                      dtype="float32")
+                                dtype="float32")
     for i, sequence in enumerate(bass_sequences):
         _, output = split(sequence)
         for j, message in enumerate(output):
@@ -109,10 +138,6 @@ def load_pickle_data(complexity, batch_size):
 
     treble_sequences = K.preprocessing.sequence.pad_sequences(treble_sequences, padding="post")
     bass_sequences = K.preprocessing.sequence.pad_sequences(bass_sequences, padding="post")
-
-    # treble_sequences = tf.data.Dataset.from_tensor_slices(treble_sequences).shuffle(10000).batch(batch_size, drop_remainder=True)
-    # bass_sequences = tf.data.Dataset.from_tensor_slices(bass_sequences).shuffle(10000).batch(batch_size, drop_remainder=True)
-    # target_sequences = tf.data.Dataset.from_tensor_slices(target_sequences).shuffle(10000).batch(batch_size, drop_remainder=True)
 
     # padded_sequences = K.preprocessing.sequence.pad_sequences(sequences, padding="post")
     # dataset = tf.data.Dataset.from_tensor_slices(padded_sequences)

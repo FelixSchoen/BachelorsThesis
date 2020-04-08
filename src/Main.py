@@ -49,7 +49,7 @@ def judge_difficulty_stitch_and_persist(name, midi_file):
     try:
         compositions = Composition.from_midi_file(midi_file)
         for composition in compositions:
-            if composition.denominator != 4:
+            if composition.numerator / composition.denominator != 4 / 4:
                 continue
             equal_classes = Composition.stitch_equal_complexity(composition.split_to_bars(), Constants.RIGHT_HAND)
             for i, equal_class in enumerate(equal_classes):

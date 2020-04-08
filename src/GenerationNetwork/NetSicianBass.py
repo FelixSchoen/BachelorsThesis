@@ -11,8 +11,8 @@ from src.MusicElements import *
 import numpy as np
 import os
 
-EPOCHS = 1
-BATCH_SIZE = 32
+EPOCHS = 5
+BATCH_SIZE = 12
 BUFFER_SIZE = 4096
 
 SAVE_PATH = "../../out/net/bass/{complexity}"
@@ -174,7 +174,16 @@ def generate(input, tempmodels):
     while not flag_stop:
         output_token, h0, c0, h1, c1 = decoder_model.predict([output] + states)
 
-        sampled_token = np.argmax(output_token[-1, :])
+        print(len(output_token))
+        print(len(output_token[-1]))
+        print(len(output_token[-1][-1]))
+
+        asdf = output_token[-1][0]
+        print(output_token[-1][-1])
+
+        break
+
+        sampled_token = np.argmax(output_token[0, -1, :])
         if sampled_token == Constants.PADDING or sampled_token == Constants.START_WORD:
             print("Start or pad")
             continue
@@ -198,12 +207,17 @@ def generate(input, tempmodels):
         output[0, sampled_element.to_neuron_representation()] = 1.
 
         states = [h0, c0, h1, c1]
+        flag_stop = True
 
     # Encode input
 
 
 def train():
     treble_sequences, bass_sequences, target_sequences = load_pickle_data(Complexity.MEDIUM)
+
+    treble_sequences = treble_sequences[0:32]
+    bass_sequences = bass_sequences[0:32]
+    target_sequences = target_sequences[0:32]
 
     models = build_models()
     training_model = models[0]
@@ -236,7 +250,7 @@ if __name__ == "__main__":
 
     SAVE_PATH = SAVE_PATH.format(complexity="medium")
 
-    train()
+    #train()
     treble_sequences, bass_sequences, target_sequences = load_pickle_data(Complexity.MEDIUM)
 
     generate_stuff(treble_sequences[0])

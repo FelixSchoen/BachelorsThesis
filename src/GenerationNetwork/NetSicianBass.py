@@ -209,12 +209,16 @@ def train():
     training_model = models[0]
     training_model.summary()
 
+    callback = K.callbacks.ModelCheckpoint(filepath=os.path.join(SAVE_PATH, CHECKPOINT_NAME), save_weights_only=True)
+
     # Run training
     training_model.compile(optimizer='rmsprop', loss='categorical_crossentropy',
                            metrics=['accuracy'])
     training_model.fit([treble_sequences, bass_sequences], target_sequences,
                        batch_size=BATCH_SIZE,
-                       epochs=EPOCHS)
+                       epochs=EPOCHS,
+                       callbacks=[callback],
+                       verbose=1)
     # Save model
     training_model.save(os.path.join(SAVE_PATH, MODEL_NAME))
 

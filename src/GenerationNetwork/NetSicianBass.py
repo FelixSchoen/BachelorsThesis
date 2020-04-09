@@ -154,7 +154,7 @@ def load_pickle_data(complexity):
 
 
 def generate(input, tempmodels):
-    models = build_models()
+    # models = build_models()
     models = tempmodels
 
     training_model = models[0]
@@ -174,15 +174,6 @@ def generate(input, tempmodels):
     while not flag_stop:
         output_token, h0, c0, h1, c1 = decoder_model.predict([output] + states)
 
-        print(len(output_token))
-        print(len(output_token[-1]))
-        print(len(output_token[-1][-1]))
-
-        asdf = output_token[-1][0]
-        print(output_token[-1][-1])
-
-        break
-
         sampled_token = np.argmax(output_token[0, -1, :])
         if sampled_token == Constants.PADDING or sampled_token == Constants.START_WORD:
             print("Start or pad")
@@ -201,7 +192,6 @@ def generate(input, tempmodels):
             continue
 
         elements.append(sampled_element)
-
 
         output = np.zeros((1, VOCAB_SIZE))
         output[0, sampled_element.to_neuron_representation()] = 1.
@@ -250,7 +240,7 @@ if __name__ == "__main__":
 
     SAVE_PATH = SAVE_PATH.format(complexity="medium")
 
-    #train()
+    # train()
     treble_sequences, bass_sequences, target_sequences = load_pickle_data(Complexity.MEDIUM)
 
     generate_stuff(treble_sequences[0])

@@ -13,7 +13,7 @@ class SequenceRelativeSuite(unittest.TestCase):
     sequence = SequenceRelative()
 
     def setUp(self):
-        SequenceRelativeSuite.midi_file = MidiFile("res/beethoven_op27_mo3.mid")
+        SequenceRelativeSuite.midi_file = MidiFile("../res/demo/beethoven_op27_mo3.mid")
         SequenceRelativeSuite.sequence = SequenceRelative.from_midi_track(self.midi_file.tracks[1])
 
     def test_sequence_from_midi_track(self):
@@ -54,22 +54,13 @@ class SequenceAbsoluteSuite(unittest.TestCase):
     def test_quantize(self):
         print(SequenceAbsolute.quantize_value(1))
 
-    def test_cutoff(self):
-        cut_file = MidiFile("res/cutoff.mid")
-        cut_seq = SequenceRelative.from_midi_track(cut_file.tracks[0])
-        cut_seq.to_absolute_sequence().cutoff(24).to_relative_sequence().adjust()
-
-        mid = MidiFile()
-        mid.tracks.append(cut_seq.to_midi_track())
-        mid.save("out.mid")
-
 
 class CompositionSuite(unittest.TestCase):
     midi_file = MidiFile()
     composition = Composition(None, None)
 
     def setUp(self):
-        CompositionSuite.midi_file = MidiFile("res/beethoven_op27_mo3.mid")
+        CompositionSuite.midi_file = MidiFile("../res/demo/beethoven_op27_mo3.mid")
         CompositionSuite.composition = Composition.from_midi_file(self.midi_file)[0]
 
     def test_composition_from_midi_file(self):
@@ -85,9 +76,7 @@ class CompositionSuite(unittest.TestCase):
         self.composition.split_to_bars()
 
     def test_composition_stitch_equal_complexity(self):
-        comps = Composition.stitch_equal_complexity(self.composition.split_to_bars(), Constants.RIGHT_HAND)
-        for i, comp in enumerate(comps):
-            comp.to_midi_file().save("./out/num" + str(i) + "compl" + str(comp.final_complexity) + ".mid")
+        Composition.stitch_equal_complexity(self.composition.split_to_bars(), Constants.RIGHT_HAND)
 
     def test_composition_get_split_timing(self):
         Composition.get_split_timing(self.midi_file.tracks[0])

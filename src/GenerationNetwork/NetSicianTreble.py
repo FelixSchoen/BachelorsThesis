@@ -7,17 +7,19 @@ from src.Utility import *
 from mido import MidiFile
 
 EPOCHS = 30
-BATCH_SIZE = 64
+BATCH_SIZE = 32
 BUFFER_SIZE = 4096
 
-SAVE_PATH = "../../out/net/lead/medium"
+SAVE_PATH = "../../out/net/treble/{complexity}"
+LOAD_PATH = "../../out/lib/{complexity}"
 CHECKPOINT_NAME = "cp_{epoch}"
 MODEL_NAME = "model.h5"
 
+# 200 Values + Padding Size
 VOCAB_SIZE = 201
 NEURON_LIST = (1024, 1024, 1024)
 DROPOUT = 0.2
-EMBEDDING_DIM = 16
+EMBEDDING_DIM = 32
 
 
 # BEGIN TENSORFLOW CONFIGURATION
@@ -72,13 +74,8 @@ def setup_tensorflow():
     tf.get_logger().setLevel("ERROR")
 
 
-def load_pickle_data(complexity, batch_size=BATCH_SIZE):
-    if complexity == Complexity.EASY:
-        path = "../../out/lib/4-4/easy"
-    elif complexity == Complexity.MEDIUM:
-        path = "../../out/lib/4-4/medium"
-    else:
-        path = "../../out/lib/4-4/hard"
+def load_data(complexity, batch_size=BATCH_SIZE):
+    path = LOAD_PATH.format(complexity=str(complexity).lower())
 
     sequences = []
 
@@ -87,7 +84,7 @@ def load_pickle_data(complexity, batch_size=BATCH_SIZE):
             print("Loading composition: " + name + " ... ", end="")
             try:
                 filepath = path + "/" + name
-                equal_class = Composition.from_file(filepath)
+                equal_class = Composition.from_midi_file(MidiFile(filepath))[0]
                 for i in range(-5, 7):
                     sequences.append(equal_class.right_hand.transpose(i).to_neuron_representation())
                 print("Done!")
@@ -101,43 +98,35 @@ def load_pickle_data(complexity, batch_size=BATCH_SIZE):
     return dataset_batches
 
 
-def load_data():
-    filepaths = []
+def train(complexity):
+    # Load data
+    data = load_data(complexity, BATCH_SIZE)
 
-    for (dirpath, dirnames, filenames) in os.walk("../../res/midi"):
-        for name in filenames:
-            filepath = dirpath + "/" + name
-            filepaths.append(filepath)
+    # Build model
+    model = build_model(neuron_list=NEURON_LIST, batch_size=BATCH_SIZE)
 
-    sequences = []
-    filepaths = Util.util_remove_elements(filepaths, -1)
+    # Try to load existing weights
+    # try:
+    #     model.load_weights(tf.train.latest_checkpoint(save_path))
+    # except AttributeError:
+    #     print("Weights could not be loaded")
 
-    for filepath in filepaths:
-        print("Loading composition: " + filepath + " ... ", end="")
-        midi_file = MidiFile(filepath)
-        try:
-            compositions = Composition.from_midi_file(midi_file)
-        except Exception:
-            print("Skipped composition: " + filepath)
-            continue
+    # Compile model
+    model.compile(optimizer="adam", loss=loss)
 
-        for composition in compositions:
-            # At this time only accept 4/4 compositions
-            if composition.numerator / composition.denominator != 4 / 4:
-                continue
+    model.summary()
+    print()
+    print(data)
 
-            # bars = composition.split_to_bars()
-            # equal_complexity_classes = Composition.stitch_to_equal_difficulty_classes(bars, track_identifier=RIGHT_HAND)
-            # for equal_complexity_class in equal_complexity_classes:
-            for i in range(-5, 7):
-                sequences.append(composition.right_hand.transpose(i).to_neuron_representation())
-        print("Done!")
+    # Set Save Path
+    save_path = SAVE_PATH.format(complexity=str(complexity).lower())
 
-    padded_sequences = tf.keras.preprocessing.sequence.pad_sequences(sequences, padding="post")
-    dataset = tf.data.Dataset.from_tensor_slices(padded_sequences)
-    dataset_split = dataset.map(split)
-    dataset_batches = dataset_split.shuffle(BUFFER_SIZE).batch(BATCH_SIZE, drop_remainder=True)
-    return dataset_batches
+    callback = tf.keras.callbacks.ModelCheckpoint(filepath=os.path.join(save_path, CHECKPOINT_NAME),
+                                                  save_weights_only=True)
+
+    model.fit(data, epochs=EPOCHS, callbacks=[callback], verbose=1)
+
+    model.save_weights(os.path.join(save_path, MODEL_NAME))
 
 
 def generate_bars(model, temperature, start_sequence, amount) -> SequenceRelative:
@@ -189,32 +178,6 @@ def generate_bars(model, temperature, start_sequence, amount) -> SequenceRelativ
     return sequence.split(max_time)[0]
 
 
-def train(save_path, neuron_list, batch_size, name):
-    data = load_pickle_data(Complexity.MEDIUM, batch_size)
-    # Build model
-    model = build_model(neuron_list=neuron_list, batch_size=batch_size)
-
-    # # Try to load existing weights
-    # try:
-    #     model.load_weights(tf.train.latest_checkpoint(save_path))
-    # except AttributeError:
-    #     print("Weights could not be loaded")
-
-    # Compile model
-    model.compile(optimizer="adam", loss=loss)
-
-    model.summary()
-    print()
-    print(data)
-
-    callback = tf.keras.callbacks.ModelCheckpoint(filepath=os.path.join(save_path, CHECKPOINT_NAME),
-                                                  save_weights_only=True)
-
-    model.fit(data, epochs=EPOCHS, callbacks=[callback], verbose=1)
-
-    model.save_weights(os.path.join(save_path, name))
-
-
 def generate(checkpoint: int = None, temp=1.0):
     # GENERATE
 
@@ -250,17 +213,8 @@ def generate(checkpoint: int = None, temp=1.0):
 if __name__ == "__main__":
     setup_tensorflow()
 
-    path = "../../out/net/lead/medium/2048x1024x2"
-    list = (2048, 1024, 1024)
-    size = 24
-    name = "model_3l_2048-1024x2_30e_24b_16em.h5"
-    train(save_path=path, neuron_list=list, batch_size=size, name=name)
-
-    path = "../../out/net/lead/medium/2048x3"
-    list = (2048, 1024, 1024)
-    size = 16
-    name = "model_3l_2048-1024x2_30e_16b_16em.h5"
-    train(save_path=path, neuron_list=list, batch_size=size, name=name)
+    # Train Medium Model
+    train(Complexity.MEDIUM)
 
     # for i in range(10, 16):
     # generate(16,temp=1.5)

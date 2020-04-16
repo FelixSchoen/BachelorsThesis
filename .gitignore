@@ -1,4 +1,4 @@
-out/gen
-out/net
-/test/res/
-/res/
+/out/gen
+/out/net
+/out/lib
+/res/midi

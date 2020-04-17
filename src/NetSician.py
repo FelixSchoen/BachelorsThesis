@@ -2,6 +2,7 @@ from mido import MidiFile
 from os import walk
 from src.MusicElements import *
 from src.Utility import *
+from src.GenerationNetwork import *
 from concurrent.futures import ThreadPoolExecutor
 
 
@@ -67,4 +68,4 @@ if __name__ == '__main__':
     print()
 
     # Uncomment line in order to generate stitched complexity classes
-    load_midi_files_and_persist()
+    # load_midi_files_and_persist()

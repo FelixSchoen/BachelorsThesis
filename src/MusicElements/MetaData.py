@@ -75,33 +75,6 @@ class MessageType(Enum):
             return "m"
 
 
-class ComplexityRating:
-
-    @staticmethod
-    def get_complexity_rating(value: float) -> int:
-        if value < 5 / 3:
-            return 1
-        elif value < 2.5:
-            return 2
-        elif value < 3.5:
-            return 3
-        elif value < 13 / 3:
-            return 4
-        else:
-            return 5
-
-    @staticmethod
-    def in_same_category(this_difficulty: float, that_difficulty: float, tolerance: float = 0.15) -> bool:
-        if ComplexityRating.get_complexity_rating(this_difficulty) == ComplexityRating.get_complexity_rating(
-                that_difficulty) or \
-                ComplexityRating.get_complexity_rating(this_difficulty) == ComplexityRating.get_complexity_rating(
-            that_difficulty + tolerance) or \
-                ComplexityRating.get_complexity_rating(this_difficulty) == ComplexityRating.get_complexity_rating(
-            that_difficulty - tolerance):
-            return True
-        return False
-
-
 class Element:
 
     def __init__(self, messagetype: MessageType, value: float, velocity: int):

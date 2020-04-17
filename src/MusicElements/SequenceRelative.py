@@ -148,6 +148,8 @@ class SequenceRelative(AbstractSequence, Persistable):
             total_wait_time -= wait_message.value
         ticks_in_bar = 4 * internal_ticks * self.numerator / self.denominator
         remaining = (ticks_in_bar - (total_wait_time % ticks_in_bar)) % ticks_in_bar
+        if len(self.elements) == 0:
+            remaining = ticks_in_bar
         self.elements.extend(self.ut_generate_wait_message(int(remaining)))
 
         return self

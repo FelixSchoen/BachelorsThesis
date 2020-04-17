@@ -7,7 +7,7 @@ from src.Utility import *
 from mido import MidiFile
 
 EPOCHS = 30
-BATCH_SIZE = 32
+BATCH_SIZE = 64
 BUFFER_SIZE = 4096
 
 SAVE_PATH = "../../out/net/treble/{complexity}"
@@ -61,9 +61,6 @@ def loss(labels, logits):
     return tf.keras.losses.sparse_categorical_crossentropy(labels, logits, from_logits=True)
 
 
-# BEGIN CLASS FUNCTIONS
-
-
 def setup_tensorflow():
     # Limit memory consumption
     physical_devices = tf.config.experimental.list_physical_devices('GPU')
@@ -72,6 +69,9 @@ def setup_tensorflow():
 
     # Set log level
     tf.get_logger().setLevel("ERROR")
+
+
+# BEGIN CLASS FUNCTIONS
 
 
 def load_data(complexity, batch_size=BATCH_SIZE):
@@ -85,6 +85,7 @@ def load_data(complexity, batch_size=BATCH_SIZE):
             try:
                 filepath = path + "/" + name
                 equal_class = Composition.from_midi_file(MidiFile(filepath))[0]
+                equal_class.preprocess()
                 for i in range(-5, 7):
                     sequences.append(equal_class.right_hand.transpose(i).to_neuron_representation())
                 print("Done!")
@@ -105,24 +106,17 @@ def train(complexity):
     # Build model
     model = build_model(neuron_list=NEURON_LIST, batch_size=BATCH_SIZE)
 
-    # Try to load existing weights
-    # try:
-    #     model.load_weights(tf.train.latest_checkpoint(save_path))
-    # except AttributeError:
-    #     print("Weights could not be loaded")
-
-    # Compile model
-    model.compile(optimizer="adam", loss=loss)
-
     model.summary()
     print()
-    print(data)
 
     # Set Save Path
     save_path = SAVE_PATH.format(complexity=str(complexity).lower())
 
     callback = tf.keras.callbacks.ModelCheckpoint(filepath=os.path.join(save_path, CHECKPOINT_NAME),
                                                   save_weights_only=True)
+
+    # Compile model
+    model.compile(optimizer="adam", loss=loss, metrics=["accuracy"])
 
     model.fit(data, epochs=EPOCHS, callbacks=[callback], verbose=1)
 
@@ -213,8 +207,8 @@ def generate(checkpoint: int = None, temp=1.0):
 if __name__ == "__main__":
     setup_tensorflow()
 
-    # Train Medium Model
-    train(Complexity.MEDIUM)
+    # Train Model
+    train(Complexity.EASY)
 
     # for i in range(10, 16):
     # generate(16,temp=1.5)

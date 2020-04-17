@@ -80,12 +80,13 @@ class SequenceAbsolute(AbstractSequence):
         self.elements = merged_elements
         return self
 
-    def cutoff(self, force: bool=False, max_val: int = 24) -> SequenceAbsolute:
-        '''
+    def cutoff(self, force: bool = False, max_val: int = 24) -> SequenceAbsolute:
+        """
         Inserts a stop message for every played message max_val time units after being played. This ensures that no
         notes stretch for too long.
+        :param force: If cutoff always should appear after max_val units or if waiting for stop event should be allowed
         :param max_val: Max time units for any given note
-        '''
+        """
         elements_to_merge = {}
 
         for entry in sorted(self.elements, key=lambda item: item[1]):
@@ -95,7 +96,8 @@ class SequenceAbsolute(AbstractSequence):
                     elements_to_merge.update(
                         {Element(MessageType.stop, element.value, element.velocity): entry[1] + max_val})
                 else:
-                    if not any(elem.message_type == MessageType.stop and elem.value == element.value and time > entry[1] for elem, time in self.elements):
+                    if not any(elem.message_type == MessageType.stop and elem.value == element.value and time > entry[1]
+                               for elem, time in self.elements):
                         elements_to_merge.update(
                             {Element(MessageType.stop, element.value, element.velocity): entry[1] + max_val})
 

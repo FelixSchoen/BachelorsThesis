@@ -123,12 +123,12 @@ def train(complexity):
     model.save_weights(os.path.join(save_path, MODEL_NAME))
 
 
-def generate_bars(model, temperature, start_sequence, amount) -> SequenceRelative:
+def generate_bars(model, start_sequence, bars, temperature) -> SequenceRelative:
     numerator = 4
     denominator = 4
 
     # Calculate maximum time for bars
-    max_time = 4 * numerator / denominator * internal_ticks * amount
+    max_time = 4 * int(numerator / denominator) * internal_ticks * bars
     wait_time = 0
 
     generated = []
@@ -169,46 +169,40 @@ def generate_bars(model, temperature, start_sequence, amount) -> SequenceRelativ
 
     sequence = SequenceRelative(numerator, denominator)
     sequence.elements = generated
+    sequence = sequence.to_absolute_sequence().cutoff(force=True).to_relative_sequence().adjust()
     return sequence.split(max_time)[0]
 
 
-def generate(checkpoint: int = None, temp=1.0):
-    # GENERATE
-
-    # Try generate bar
-
+def generate(complexity, bars, start_sequence=[128], checkpoint=-1, temp=1.0) -> SequenceRelative:
     # Load model with batch size of 1
     model = build_model(batch_size=1)
 
-    if checkpoint is None:
-        model.load_weights(tf.train.latest_checkpoint(SAVE_PATH))
-    else:
-        model.load_weights(SAVE_PATH + "\cp_" + str(checkpoint))
+    # Set Save Path
+    save_path = SAVE_PATH.format(complexity=str(complexity).lower())
 
-    # To load model
-    # model.load_weights(os.path.join(SAVE_PATH, "model_medium.h5"))
+    if checkpoint == -1:
+        model.load_weights(os.path.join(save_path, MODEL_NAME))
+    else:
+        model.load_weights(save_path + "\cp_" + str(checkpoint))
 
     model.build(tf.TensorShape([1, None]))
 
-    seq = generate_bars(model, temp, [155], 8)
+    seq = generate_bars(model, start_sequence, bars, temp)
     seq = seq.to_absolute_sequence().quantize().to_relative_sequence().adjust()
-    print(seq)
 
-    file = MidiFile()
-    file.tracks.append(seq.to_midi_track())
-    file.save("out/o_epoch-" + str(checkpoint) + "_temp-" + str(temp) + "_nocutoff.mid")
-
-    seq = seq.to_absolute_sequence().cutoff(force=True).to_relative_sequence().adjust()
-    file = MidiFile()
-    file.tracks.append(seq.to_midi_track())
-    file.save("out/o_epoch-" + str(checkpoint) + "_temp-" + str(temp) + "_cutoff.mid")
+    return seq
 
 
 if __name__ == "__main__":
     setup_tensorflow()
 
     # Train Model
-    train(Complexity.EASY)
+    # train(Complexity.MEDIUM)
 
-    # for i in range(10, 16):
-    # generate(16,temp=1.5)
+    # Generate Sequence
+    sequence = generate(Complexity.MEDIUM, 8, temp=1.0)
+
+    # Generate Midi File
+    midi_file = MidiFile()
+    midi_file.tracks.append(sequence.to_midi_track())
+    midi_file.save("../../out/gen/generated.mid")

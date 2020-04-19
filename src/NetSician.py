@@ -47,6 +47,62 @@ def load_midi_files_and_persist():
         executor.submit(judge_difficulty_stitch_and_persist, pairing[1][:-4], midi_file)
 
 
+def count_complexity_classes():
+    print("Started Complexity Count")
+    print()
+
+    countRightEasy = 0
+    countRightMedium = 0
+    countRightHard = 0
+    countLeftEasy = 0
+    countLeftMedium = 0
+    countLeftHard = 0
+
+    directories = []
+    for (dirpath, dirnames, filenames) in walk("../res/midi"):
+        for name in filenames:
+            directories.append((dirpath + "/" + name, name))
+
+    for pairing in directories:
+        midi_file = MidiFile(pairing[0])
+        try:
+            compositions = Composition.from_midi_file(midi_file)
+
+            for composition in compositions:
+                if composition.numerator / composition.denominator != 4 / 4:
+                    # Only allow compositions of 4/4 time signature
+                    continue
+
+                for bar in composition.split_to_bars():
+                    complexity = bar.right_hand.complexity()
+
+                    if complexity == Complexity.EASY:
+                        countRightEasy += 1
+                    elif complexity == Complexity.MEDIUM:
+                        countRightMedium += 1
+                    else:
+                        countRightHard += 1
+
+                    complexity = bar.left_hand.complexity()
+
+                    if complexity == Complexity.EASY:
+                        countLeftEasy += 1
+                    elif complexity == Complexity.MEDIUM:
+                        countLeftMedium += 1
+                    else:
+                        countLeftHard += 1
+
+                print("Judged " + pairing[1][:-4])
+
+        except Exception as e:
+            print(name, e)
+
+    print()
+    print("Results:")
+    print("Right Hand: Easy: {easy}, Medium: {medium}, Hard: {hard}".format(easy=countRightEasy, medium=countRightMedium, hard=countRightHard))
+    print("Left Hand: Easy: {easy}, Medium: {medium}, Hard: {hard}".format(easy=countLeftEasy, medium=countLeftMedium, hard=countLeftHard))
+
+
 if __name__ == '__main__':
     print("Begin Demo")
     print()
@@ -69,3 +125,6 @@ if __name__ == '__main__':
 
     # Uncomment line in order to generate stitched complexity classes
     # load_midi_files_and_persist()
+
+    # Calculate amount of each complexity class for each hand
+    count_complexity_classes()

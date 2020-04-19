@@ -312,11 +312,6 @@ class SequenceRelative(AbstractSequence, Persistable):
             if sum(map(lambda c: c.value,
                        secondary_complexity)) > 2 * Complexity.MEDIUM.value or complexity_pattern == Complexity.HARD:
                 return Complexity.HARD
-            # if complexity_pattern == Complexity.HARD or \
-            #         (complexity_pattern > Complexity.EASY
-            #          and sum(map(lambda c: c <= Complexity.EASY, secondary_complexity)) <= 1) or \
-            #         (sum(map(lambda c: c <= Complexity.MEDIUM, secondary_complexity)) <= 2):
-            #     return Complexity.HARD
             else:
                 return Complexity.MEDIUM
         else:

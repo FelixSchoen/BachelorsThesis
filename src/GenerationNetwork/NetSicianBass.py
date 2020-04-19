@@ -11,8 +11,8 @@ from src.MusicElements import *
 import numpy as np
 import os
 
-EPOCHS = 30
-BATCH_SIZE = 8
+EPOCHS = 6
+BATCH_SIZE = 16
 
 SAVE_PATH = "../../out/net/bass/{complexity}"
 LOAD_PATH = "../../out/lib/{complexity}"
@@ -22,13 +22,13 @@ MODEL_NAME = "model.h5"
 VOCAB_SIZE = 203
 NEURON_LIST = (1024, 1024, 1024)
 DROPOUT = 0.2
-EMBEDDING_DIM = 16
+EMBEDDING_DIM = 32
 
 
 # TENSORFLOW
 
 
-def build_models(neuron_list=NEURON_LIST):
+def build_models(neuron_list=NEURON_LIST, checkpoint=None, complexity=Complexity.MEDIUM):
     # Encoder Model
     enc_layer_input = Input(shape=(None,), name="Enc_Input")
     enc_layer_embedding = Embedding(VOCAB_SIZE, EMBEDDING_DIM, mask_zero=True, name="Enc_Embedding")
@@ -58,7 +58,7 @@ def build_models(neuron_list=NEURON_LIST):
     dec_layer_dropout_1 = Dropout(DROPOUT)
     dec_layer_hidden_2 = LSTM(neuron_list[-1], return_sequences=True, return_state=True, name="Dec_Hidden_2")
     dec_layer_dropout_2 = Dropout(DROPOUT)
-    dec_layer_output = Dense(VOCAB_SIZE, activation="softmax", name="Dec_Output")
+    dec_layer_output = Dense(VOCAB_SIZE, name="Dec_Output")
 
     # Apply Layers
     dec_output_embedding = dec_layer_embedding(dec_layer_input)
@@ -73,44 +73,58 @@ def build_models(neuron_list=NEURON_LIST):
     # Build Model
     training_model = Model(inputs=[enc_layer_input, dec_layer_input], outputs=dec_output_output, name="Training_Model")
 
-    # =========
-    # Inference
-    # =========
+    if checkpoint is not None:
+        # Load Inference models
 
-    # Encoder
-    ienc_model = Model(inputs=enc_layer_input, outputs=enc_states, name="Inference_Encoder_Model")
+        # Load weights
+        # Set Save Path
+        save_path = SAVE_PATH.format(complexity=str(complexity).lower())
 
-    # Decoder Model
-    idec_layer_input_h0 = Input(shape=(neuron_list[0],), name="IDec_Input_h0")
-    idec_layer_input_c0 = Input(shape=(neuron_list[0],), name="IDec_Input_c0")
-    idec_layer_input_h1 = Input(shape=(neuron_list[1],), name="IDec_Input_h1")
-    idec_layer_input_c1 = Input(shape=(neuron_list[1],), name="IDec_Input_c1")
-    idec_layer_input_h2 = Input(shape=(neuron_list[2],), name="IDec_Input_h2")
-    idec_layer_input_c2 = Input(shape=(neuron_list[2],), name="IDec_Input_c2")
-    idec_states_input = [idec_layer_input_h0, idec_layer_input_c0, idec_layer_input_h1, idec_layer_input_c1,
-                         idec_layer_input_h2, idec_layer_input_c2]
+        if checkpoint == -1:
+            training_model.load_weights(os.path.join(save_path, MODEL_NAME))
+        else:
+            training_model.load_weights(save_path + "\cp_" + str(checkpoint))
 
-    # Apply Layers
-    idec_output_embedding = dec_layer_embedding(dec_layer_input)
-    idec_output_hidden_0, idec_h0, idec_c0 = dec_layer_hidden_0(idec_output_embedding,
-                                                                initial_state=idec_states_input[0:2])
-    idec_output_dropout_0 = dec_layer_dropout_0(idec_output_hidden_0)
-    idec_output_hidden_1, idec_h1, idec_c1 = dec_layer_hidden_1(idec_output_dropout_0,
-                                                                initial_state=idec_states_input[2:4])
-    dec_output_dropout_1 = dec_layer_dropout_1(idec_output_hidden_1)
-    idec_output_hidden_2, idec_h2, idec_c2 = dec_layer_hidden_1(dec_output_dropout_1,
-                                                                initial_state=idec_states_input[4:6])
-    dec_output_dropout_2 = dec_layer_dropout_2(idec_output_hidden_2)
-    idec_output_output = dec_layer_output(dec_output_dropout_2)
+        # =========
+        # Inference
+        # =========
 
-    # Save States
-    idec_states = [idec_h0, idec_c0, idec_h1, idec_c1, idec_h2, idec_c2]
+        # Encoder
+        ienc_model = Model(inputs=enc_layer_input, outputs=enc_states, name="Inference_Encoder_Model")
 
-    # Build Model
-    idec_model = Model(inputs=[dec_layer_input] + idec_states_input, outputs=[idec_output_output] + idec_states,
-                       name="Interference_Decoder_Model")
+        # Decoder Model
+        idec_layer_input_h0 = Input(shape=(neuron_list[0],), name="IDec_Input_h0")
+        idec_layer_input_c0 = Input(shape=(neuron_list[0],), name="IDec_Input_c0")
+        idec_layer_input_h1 = Input(shape=(neuron_list[1],), name="IDec_Input_h1")
+        idec_layer_input_c1 = Input(shape=(neuron_list[1],), name="IDec_Input_c1")
+        idec_layer_input_h2 = Input(shape=(neuron_list[2],), name="IDec_Input_h2")
+        idec_layer_input_c2 = Input(shape=(neuron_list[2],), name="IDec_Input_c2")
+        idec_states_input = [idec_layer_input_h0, idec_layer_input_c0, idec_layer_input_h1, idec_layer_input_c1,
+                             idec_layer_input_h2, idec_layer_input_c2]
 
-    return training_model, ienc_model, idec_model
+        # Apply Layers
+        idec_output_embedding = dec_layer_embedding(dec_layer_input)
+        idec_output_hidden_0, idec_h0, idec_c0 = dec_layer_hidden_0(idec_output_embedding,
+                                                                    initial_state=idec_states_input[0:2])
+        idec_output_dropout_0 = dec_layer_dropout_0(idec_output_hidden_0)
+        idec_output_hidden_1, idec_h1, idec_c1 = dec_layer_hidden_1(idec_output_dropout_0,
+                                                                    initial_state=idec_states_input[2:4])
+        idec_output_dropout_1 = dec_layer_dropout_1(idec_output_hidden_1)
+        idec_output_hidden_2, idec_h2, idec_c2 = dec_layer_hidden_2(idec_output_dropout_1,
+                                                                    initial_state=idec_states_input[4:6])
+        idec_output_dropout_2 = dec_layer_dropout_2(idec_output_hidden_2)
+        idec_output_output = dec_layer_output(idec_output_dropout_2)
+
+        # Save States
+        idec_states = [idec_h0, idec_c0, idec_h1, idec_c1, idec_h2, idec_c2]
+
+        # Build Model
+        idec_model = Model(inputs=[dec_layer_input] + idec_states_input, outputs=[idec_output_output] + idec_states,
+                           name="Interference_Decoder_Model")
+
+        return training_model, ienc_model, idec_model
+    else:
+        return training_model, None, None
 
 
 def split(chunk):
@@ -189,6 +203,8 @@ def train(complexity):
     # Set Save Path
     save_path = SAVE_PATH.format(complexity=str(complexity).lower())
 
+    # training_model.load_weights(os.path.join(save_path, "cp_6"))
+
     callback = K.callbacks.ModelCheckpoint(filepath=os.path.join(save_path, CHECKPOINT_NAME), save_weights_only=True)
 
     # Run training
@@ -204,11 +220,7 @@ def train(complexity):
     training_model.save(os.path.join(save_path, MODEL_NAME))
 
 
-def generate(input, tempmodels):
-    # models = build_models()
-    models = tempmodels
-
-    training_model = models[0]
+def generate_bars(models, input, max_wait, temperature) -> SequenceRelative:
     encoder_model = models[1]
     decoder_model = models[2]
 
@@ -221,26 +233,25 @@ def generate(input, tempmodels):
     flag_stop = False
 
     elements = []
+    wait_buffer = 0
 
     while not flag_stop:
         output_token, h0, c0, h1, c1, h2, c2 = decoder_model.predict([output] + states)
 
-        sampled_token = np.argmax(output_token[0, -1, :])
+        sampled_token = tf.random.categorical([output_token[0, -1, :]], num_samples=1)[-1, 0].numpy()
+        #sampled_token = np.argmax(output_token[0, -1, :])
+
         if sampled_token == Constants.PADDING or sampled_token == Constants.START_WORD:
             print("Start or pad")
             continue
         if sampled_token == Constants.END_WORD:
+            print("End Word")
             flag_stop = True
             continue
 
-        try:
-            sampled_element = Element.from_neuron_representation(sampled_token)
-        except Exceptions.InvalidRepresentation:
-            print("Invalid representation of {token}".format(token=sampled_token))
-            output = np.zeros((1, VOCAB_SIZE))
-            output[0, 0] = 1.
-            states = [h0, c0, h1, c1, h2, c2]
-            continue
+        sampled_element = Element.from_neuron_representation(sampled_token)
+        if sampled_element.message_type == MessageType.wait:
+            wait_buffer += sampled_element.value
 
         elements.append(sampled_element)
 
@@ -248,21 +259,43 @@ def generate(input, tempmodels):
         output[0, sampled_element.to_neuron_representation()] = 1.
 
         states = [h0, c0, h1, c1, h2, c2]
-        flag_stop = True
+        if wait_buffer >= max_wait:
+            flag_stop = True
 
-    # Encode input
+    seq = SequenceRelative()
+    seq.elements = elements
+    seq = seq.adjust().to_absolute_sequence().cutoff(force=True).to_relative_sequence().adjust()
+    return seq
 
 
-def generate_stuff(stuff):
-    models = build_models()
-    training_model = models[0]
-    training_model.load_weights(os.path.join(SAVE_PATH, MODEL_NAME))
+def generate(sequence, complexity, checkpoint=-1, temp=1.0):
+    models = build_models(checkpoint=checkpoint, complexity=complexity)
 
-    generate(stuff, models)
+    bars = sequence.split_to_bars()
+    seq = SequenceRelative().stitch(bars[0]).stitch(bars[1])
+    input = seq.to_neuron_representation()
+    max_wait = 0
+    for element in sequence.elements:
+        if element.message_type == MessageType.wait:
+            max_wait += element.value
+
+    return generate_bars(models, input, max_wait, temp)
 
 
 if __name__ == "__main__":
     setup_tensorflow()
 
     # Train Model
-    train(Complexity.MEDIUM)
+    # train(Complexity.EASY)
+
+    comp = Composition.from_midi_file(MidiFile("../../res/demo/beethoven_op27_mo1.mid"))[0]
+    primer = comp.right_hand
+    seq = generate(primer, Complexity.EASY, checkpoint=12)
+
+    print(seq)
+
+    # Generate Midi File
+    midi_file = MidiFile()
+    midi_file.tracks.append(seq.to_midi_track())
+    comp.to_midi_file().save("../../out/gen/vorlage.mid")
+    midi_file.save("../../out/gen/bass.mid")

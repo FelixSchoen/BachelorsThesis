@@ -205,4 +205,4 @@ if __name__ == "__main__":
     # Generate Midi File
     midi_file = MidiFile()
     midi_file.tracks.append(sequence.to_midi_track())
-    midi_file.save("../../out/gen/generated.mid")
+    midi_file.save("../../out/gen/treble.mid")

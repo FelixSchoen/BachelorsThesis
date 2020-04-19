@@ -60,7 +60,7 @@ class CompositionSuite(unittest.TestCase):
     composition = Composition(None, None)
 
     def setUp(self):
-        CompositionSuite.midi_file = MidiFile("../res/demo/beethoven_op27_mo3.mid")
+        CompositionSuite.midi_file = MidiFile("../res/demo/beethoven_op27_mo1.mid")
         CompositionSuite.composition = Composition.from_midi_file(self.midi_file)[0]
 
     def test_composition_from_midi_file(self):

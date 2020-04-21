@@ -11,8 +11,8 @@ from src.MusicElements import *
 import numpy as np
 import os
 
-EPOCHS = 6
-BATCH_SIZE = 16
+EPOCHS = 30
+BATCH_SIZE = 8
 
 SAVE_PATH = "../../out/net/bass/{complexity}"
 LOAD_PATH = "../../out/lib/{complexity}"
@@ -163,7 +163,7 @@ def load_data(complexity):
                 right_hand = equal_class.right_hand
                 left_hand = equal_class.left_hand
                 left_hand.elements.insert(0, Element(MessageType.meta, 0, std_velocity))
-                left_hand.elements.insert(-1, Element(MessageType.meta, 1, std_velocity))
+                left_hand.elements.append(Element(MessageType.meta, 1, std_velocity))
 
                 for i in range(-5, 7):
                     treble_sequences.append(right_hand.transpose(i).to_neuron_representation())
@@ -208,7 +208,7 @@ def train(complexity):
     callback = K.callbacks.ModelCheckpoint(filepath=os.path.join(save_path, CHECKPOINT_NAME), save_weights_only=True)
 
     # Run training
-    training_model.compile(optimizer="adam", loss="categorical_crossentropy",
+    training_model.compile(optimizer="adagrad", loss="categorical_crossentropy",
                            metrics=["accuracy"])
 
     training_model.fit([treble_sequences, bass_sequences], target_sequences,
@@ -238,8 +238,9 @@ def generate_bars(models, input, max_wait, temperature) -> SequenceRelative:
     while not flag_stop:
         output_token, h0, c0, h1, c1, h2, c2 = decoder_model.predict([output] + states)
 
+        output_token = output_token / temperature
         sampled_token = tf.random.categorical([output_token[0, -1, :]], num_samples=1)[-1, 0].numpy()
-        #sampled_token = np.argmax(output_token[0, -1, :])
+        # sampled_token = np.argmax(output_token[0, -1, :])
 
         if sampled_token == Constants.PADDING or sampled_token == Constants.START_WORD:
             print("Start or pad")
@@ -271,9 +272,7 @@ def generate_bars(models, input, max_wait, temperature) -> SequenceRelative:
 def generate(sequence, complexity, checkpoint=-1, temp=1.0):
     models = build_models(checkpoint=checkpoint, complexity=complexity)
 
-    bars = sequence.split_to_bars()
-    seq = SequenceRelative().stitch(bars[0]).stitch(bars[1])
-    input = seq.to_neuron_representation()
+    input = sequence.to_neuron_representation()
     max_wait = 0
     for element in sequence.elements:
         if element.message_type == MessageType.wait:
@@ -286,16 +285,19 @@ if __name__ == "__main__":
     setup_tensorflow()
 
     # Train Model
-    # train(Complexity.EASY)
+    train(Complexity.MEDIUM)
 
-    comp = Composition.from_midi_file(MidiFile("../../res/demo/beethoven_op27_mo1.mid"))[0]
-    primer = comp.right_hand
-    seq = generate(primer, Complexity.EASY, checkpoint=12)
-
-    print(seq)
-
-    # Generate Midi File
-    midi_file = MidiFile()
-    midi_file.tracks.append(seq.to_midi_track())
-    comp.to_midi_file().save("../../out/gen/vorlage.mid")
-    midi_file.save("../../out/gen/bass.mid")
+    # comp = Composition.from_midi_file(MidiFile("../../res/demo/beethoven_op27_mo1.mid"))[0]
+    # primer = comp.right_hand
+    # bars = primer.split_to_bars()
+    # primer = SequenceRelative().stitch(bars[0]).stitch(bars[1])
+    # seq = generate(primer, Complexity.EASY, checkpoint=20, temp=1.5)
+    # seq.adjust()
+    #
+    # print(seq)
+    #
+    # # Generate Midi File
+    # midi_file = MidiFile()
+    # midi_file.tracks.append(seq.to_midi_track())
+    # comp.to_midi_file().save("../../out/gen/vorlage.mid")
+    # midi_file.save("../../out/gen/bass.mid")

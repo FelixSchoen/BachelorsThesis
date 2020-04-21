@@ -173,7 +173,7 @@ def generate_bars(model, start_sequence, bars, temperature) -> SequenceRelative:
     return sequence.split(max_time)[0]
 
 
-def generate(complexity, bars, start_sequence=[128], checkpoint=-1, temp=1.0) -> SequenceRelative:
+def generate(complexity, bars, start_sequence=[140], checkpoint=-1, temp=1.0) -> SequenceRelative:
     # Load model with batch size of 1
     model = build_model(batch_size=1)
 
@@ -200,9 +200,9 @@ if __name__ == "__main__":
     # train(Complexity.MEDIUM)
 
     # Generate Sequence
-    sequence = generate(Complexity.MEDIUM, 8, temp=1.0)
+    sequence = generate(Complexity.EASY, 8, temp=1.0)
 
     # Generate Midi File
     midi_file = MidiFile()
     midi_file.tracks.append(sequence.to_midi_track())
-    midi_file.save("../../out/gen/treble.mid")
+    midi_file.save("../../out/gen/treble_easy.mid")

@@ -1,6 +1,6 @@
 # Bachelor's Thesis
 
-This repository contains the practical part of my Bachelor's Thesis, written in the summer semester of 2020. The goal was to create an application capable of composing (piano) music using neural networks.
+This repository contains the practical part of my [Bachelor's Thesis](https://github.com/FelixSchoen/BachelorsThesis/blob/master/BachelorsThesis.pdf), written in the summer semester of 2020. The goal was to create an application capable of composing (piano) music using neural networks.
 
 ## Dependencies
 These technologies were used during the course of the project. In order to generate new pieces, a capable graphics card and a fitting version of CUDA is highly recommended.

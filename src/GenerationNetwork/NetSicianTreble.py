@@ -200,7 +200,7 @@ if __name__ == "__main__":
     # train(Complexity.MEDIUM)
 
     # Generate Sequence
-    sequence = generate(Complexity.EASY, 8, temp=1.0)
+    sequence = generate(Complexity.EASY, 4, temp=1.0)
 
     # Generate Midi File
     midi_file = MidiFile()

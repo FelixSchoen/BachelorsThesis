@@ -110,6 +110,10 @@ class Element:
         elif 176 <= value - add < 200:
             return Element(messagetype=MessageType.wait, value=value + 1 - 2 * 88 - add,
                            velocity=Constants.std_velocity)
+        elif 200 <= value - add < 202:
+            return Element(messagetype=MessageType.meta, value=value - 200, velocity=Constants.std_velocity)
+        elif value - add == -1:
+            return Element(messagetype=MessageType.meta, value= -1, velocity=Constants.std_velocity)
         else:
             raise Exceptions.InvalidRepresentation
 

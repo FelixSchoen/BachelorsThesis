@@ -208,7 +208,7 @@ def train(complexity):
     callback = K.callbacks.ModelCheckpoint(filepath=os.path.join(save_path, CHECKPOINT_NAME), save_weights_only=True)
 
     # Run training
-    training_model.compile(optimizer="adagrad", loss="categorical_crossentropy",
+    training_model.compile(optimizer="adadelta", loss="categorical_crossentropy",
                            metrics=["accuracy"])
 
     training_model.fit([treble_sequences, bass_sequences], target_sequences,
@@ -242,9 +242,10 @@ def generate_bars(models, input, max_wait, temperature) -> SequenceRelative:
         sampled_token = tf.random.categorical([output_token[0, -1, :]], num_samples=1)[-1, 0].numpy()
         # sampled_token = np.argmax(output_token[0, -1, :])
 
+        print(sampled_token)
+
         if sampled_token == Constants.PADDING or sampled_token == Constants.START_WORD:
             print("Start or pad")
-            continue
         if sampled_token == Constants.END_WORD:
             print("End Word")
             flag_stop = True
@@ -273,6 +274,7 @@ def generate(sequence, complexity, checkpoint=-1, temp=1.0):
     models = build_models(checkpoint=checkpoint, complexity=complexity)
 
     input = sequence.to_neuron_representation()
+    print(input)
     max_wait = 0
     for element in sequence.elements:
         if element.message_type == MessageType.wait:
@@ -285,19 +287,19 @@ if __name__ == "__main__":
     setup_tensorflow()
 
     # Train Model
-    train(Complexity.MEDIUM)
+    #train(Complexity.MEDIUM)
 
-    # comp = Composition.from_midi_file(MidiFile("../../res/demo/beethoven_op27_mo1.mid"))[0]
-    # primer = comp.right_hand
-    # bars = primer.split_to_bars()
-    # primer = SequenceRelative().stitch(bars[0]).stitch(bars[1])
-    # seq = generate(primer, Complexity.EASY, checkpoint=20, temp=1.5)
-    # seq.adjust()
-    #
-    # print(seq)
-    #
-    # # Generate Midi File
-    # midi_file = MidiFile()
-    # midi_file.tracks.append(seq.to_midi_track())
-    # comp.to_midi_file().save("../../out/gen/vorlage.mid")
-    # midi_file.save("../../out/gen/bass.mid")
+    comp = Composition.from_midi_file(MidiFile("../../res/demo/beethoven_op27_mo1.mid"))[0]
+    primer = comp.right_hand
+    bars = primer.split_to_bars()
+    primer = SequenceRelative().stitch(bars[0]).stitch(bars[1])
+    seq = generate(primer, Complexity.MEDIUM, checkpoint=1, temp=1.5)
+    seq.adjust()
+
+    print(seq)
+
+    # Generate Midi File
+    midi_file = MidiFile()
+    midi_file.tracks.append(seq.to_midi_track())
+    comp.to_midi_file().save("../../out/gen/vorlage.mid")
+    midi_file.save("../../out/gen/bass.mid")
